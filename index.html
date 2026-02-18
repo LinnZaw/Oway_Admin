@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TriRide Admin Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="d-flex" id="appShell">
+    <aside class="sidebar p-3">
+      <div class="brand-wrap mb-4">
+        <div class="brand-icon">3W</div>
+        <div>
+          <h1 class="h5 mb-0 fw-bold">TriRide Admin</h1>
+          <small class="text-muted">Fleet Control Center</small>
+        </div>
+      </div>
+
+      <ul class="nav flex-column gap-1">
+        <li class="nav-item"><a class="nav-link active" href="#"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-people"></i> Drivers</a></li>
+        <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-car-front"></i> Vehicles</a></li>
+        <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-map"></i> Trips</a></li>
+        <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-cash-stack"></i> Payments</a></li>
+        <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-shield-check"></i> Safety</a></li>
+      </ul>
+    </aside>
+
+    <main class="content flex-grow-1">
+      <header class="topbar d-flex justify-content-between align-items-center p-3 p-md-4">
+        <div>
+          <h2 class="h4 mb-1 fw-bold">Admin Overview</h2>
+          <p class="text-muted mb-0">Manage your yellow 3-wheeler ride network in one place.</p>
+        </div>
+        <button id="refreshBtn" class="btn btn-warning fw-semibold">Refresh Data</button>
+      </header>
+
+      <section class="px-3 px-md-4 pb-4">
+        <div class="row g-3 mb-4" id="statsGrid"></div>
+
+        <div class="row g-3">
+          <div class="col-lg-8">
+            <div class="panel p-3 p-md-4 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h5 mb-0 fw-bold">Live Trip Queue</h3>
+                <span class="badge bg-warning text-dark">Real-time</span>
+              </div>
+              <div class="table-responsive">
+                <table class="table align-middle">
+                  <thead>
+                    <tr>
+                      <th>Ride ID</th>
+                      <th>Driver</th>
+                      <th>Vehicle No.</th>
+                      <th>Status</th>
+                      <th>ETA</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tripTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="panel p-3 p-md-4 h-100">
+              <h3 class="h5 mb-3 fw-bold">Operational Actions</h3>
+              <div class="d-grid gap-2">
+                <button class="btn btn-dark" onclick="sendAlert()">Send Fleet Alert</button>
+                <button class="btn btn-outline-dark" onclick="assignVehicle()">Assign Backup Vehicle</button>
+                <button class="btn btn-outline-dark" onclick="downloadReport()">Download Daily Report</button>
+              </div>
+              <hr>
+              <h4 class="h6 fw-bold">Coverage Zones</h4>
+              <ul class="small text-muted mb-0">
+                <li>City Center - High Demand</li>
+                <li>Market Route - Medium Demand</li>
+                <li>Campus Route - High Demand</li>
+                <li>Airport Link - Low Demand</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <script src="script.js"></script>
+</body>
+</html>
