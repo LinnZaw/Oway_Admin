@@ -1,0 +1,109 @@
+:root {
+  --brand-yellow: #ffc107;
+  --brand-yellow-dark: #e0a800;
+  --sidebar-bg: #1f1f1f;
+  --panel-bg: #ffffff;
+  --surface-bg: #f8f9fa;
+}
+
+body {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  background: var(--surface-bg);
+  color: #202124;
+}
+
+#appShell {
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 270px;
+  background: var(--sidebar-bg);
+  color: #fff;
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--brand-yellow);
+  color: #111;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+}
+
+.sidebar .nav-link {
+  color: #d6d6d6;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+  color: #111;
+  background: var(--brand-yellow);
+}
+
+.content {
+  background: linear-gradient(180deg, #fffbe6 0%, #f8f9fa 32%);
+}
+
+.topbar {
+  border-bottom: 1px solid #ececec;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f0f0f0;
+}
+
+.stat-card {
+  border-radius: 14px;
+  color: #1d1d1d;
+}
+
+.stat-card .label {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.stat-card .value {
+  font-size: 1.7rem;
+  font-weight: 700;
+}
+
+.table thead th {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #6c757d;
+}
+
+.badge.status {
+  min-width: 90px;
+}
+
+@media (max-width: 992px) {
+  .sidebar {
+    width: 85px;
+  }
+
+  .brand-wrap h1,
+  .brand-wrap small,
+  .sidebar .nav-link {
+    font-size: 0;
+  }
+
+  .sidebar .nav-link i {
+    font-size: 1.1rem;
+  }
+}
