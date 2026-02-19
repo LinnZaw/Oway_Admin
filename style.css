@@ -1,0 +1,142 @@
+:root {
+  --brand-yellow: #ffc107;
+  --brand-yellow-dark: #e0a800;
+  --sidebar-bg: #1f1f1f;
+  --panel-bg: #ffffff;
+  --surface-bg: #f8f9fa;
+}
+
+body {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  background: var(--surface-bg);
+  color: #202124;
+}
+
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at 20% 20%, #fff4cc, #f8f9fa 40%, #f2f4f7 100%);
+}
+
+.login-card {
+  width: min(460px, 100%);
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px;
+  border: 1px solid #eceff3;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.08);
+}
+
+.login-logo {
+  width: 78px;
+  height: 78px;
+  border-radius: 14px;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.form-control {
+  border-radius: 12px;
+  border: 1px solid #dfe3e8;
+}
+
+.form-control:focus {
+  border-color: var(--brand-yellow-dark);
+  box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.18);
+}
+
+#appShell {
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 270px;
+  background: var(--sidebar-bg);
+  color: #fff;
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid rgba(255, 193, 7, 0.45);
+}
+
+.sidebar .nav-link {
+  color: #d6d6d6;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+  color: #111;
+  background: var(--brand-yellow);
+}
+
+.content {
+  background: linear-gradient(180deg, #fffbe6 0%, #f8f9fa 32%);
+}
+
+.topbar {
+  border-bottom: 1px solid #ececec;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f0f0f0;
+}
+
+.stat-card {
+  border-radius: 14px;
+  color: #1d1d1d;
+}
+
+.stat-card .label {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.stat-card .value {
+  font-size: 1.7rem;
+  font-weight: 700;
+}
+
+.table thead th {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #6c757d;
+}
+
+.badge.status {
+  min-width: 90px;
+}
+
+@media (max-width: 992px) {
+  .sidebar {
+    width: 85px;
+  }
+
+  .brand-wrap h1,
+  .brand-wrap small,
+  .sidebar .nav-link {
+    font-size: 0;
+  }
+
+  .sidebar .nav-link i {
+    font-size: 1.1rem;
+  }
+}
