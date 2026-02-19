@@ -12,6 +12,14 @@ const liveTrips = [
   { id: 'TR-5024', driver: 'Sanjeewa Fernando', vehicle: 'TW-6252', status: 'In Progress', eta: '11 min' }
 ];
 
+const AUTH_KEY = 'oway_admin_logged_in';
+const loginView = document.getElementById('loginView');
+const dashboardView = document.getElementById('dashboardView');
+const loginForm = document.getElementById('loginForm');
+const loginError = document.getElementById('loginError');
+const refreshBtn = document.getElementById('refreshBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+
 function renderStats() {
   const statsGrid = document.getElementById('statsGrid');
   statsGrid.innerHTML = stats.map(item => `
@@ -69,7 +77,57 @@ function refreshDashboard() {
   renderTrips();
 }
 
-document.getElementById('refreshBtn').addEventListener('click', refreshDashboard);
+function showDashboard() {
+  loginView.classList.add('d-none');
+  dashboardView.classList.remove('d-none');
+  renderStats();
+  renderTrips();
+}
 
-renderStats();
-renderTrips();
+function showLogin() {
+  dashboardView.classList.add('d-none');
+  loginView.classList.remove('d-none');
+}
+
+function login(username, password) {
+  if (!username || !password) {
+    return false;
+  }
+
+  localStorage.setItem(AUTH_KEY, 'true');
+  return true;
+}
+
+function logout() {
+  localStorage.removeItem(AUTH_KEY);
+  showLogin();
+  loginForm.reset();
+}
+
+loginForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  if (login(username, password)) {
+    loginError.classList.add('d-none');
+    showDashboard();
+    return;
+  }
+
+  loginError.classList.remove('d-none');
+});
+
+refreshBtn.addEventListener('click', refreshDashboard);
+logoutBtn.addEventListener('click', logout);
+
+if (localStorage.getItem(AUTH_KEY) === 'true') {
+  showDashboard();
+} else {
+  showLogin();
+}
+
+window.sendAlert = sendAlert;
+window.assignVehicle = assignVehicle;
+window.downloadReport = downloadReport;

@@ -1,0 +1,13 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">O_way logo</title>
+  <desc id="desc">Orange background with white 3-wheel icon and O_way text.</desc>
+  <rect width="512" height="512" fill="#f29a2f"/>
+  <circle cx="256" cy="190" r="125" fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round" stroke-dasharray="720 120"/>
+  <circle cx="146" cy="242" r="44" fill="none" stroke="#fff" stroke-width="12"/>
+  <circle cx="366" cy="242" r="44" fill="none" stroke="#fff" stroke-width="12"/>
+  <path d="M170 238 L190 182 H235" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M236 182 L272 238 L302 210 L330 238" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="366" cy="242" r="8" fill="#fff"/>
+  <text x="256" y="360" text-anchor="middle" fill="#ffffff" font-size="58" font-weight="700" font-family="Arial, Helvetica, sans-serif">O_way</text>
+  <text x="256" y="398" text-anchor="middle" fill="#ffffff" font-size="34" letter-spacing="2" font-family="Arial, Helvetica, sans-serif">Myanmar</text>
+</svg>
