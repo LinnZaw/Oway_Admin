@@ -43,9 +43,9 @@
         </div>
 
         <ul class="nav flex-column gap-1">
-          <li class="nav-item"><a class="nav-link active" href="#"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+          <li class="nav-item"><a id="dashboardNav" class="nav-link active" href="#"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-people"></i> Drivers</a></li>
-          <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-car-front"></i> Vehicles</a></li>
+          <li class="nav-item"><a id="vehiclesNav" class="nav-link" href="#"><i class="bi bi-car-front"></i> Vehicles</a></li>
           <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-map"></i> Trips</a></li>
           <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-cash-stack"></i> Payments</a></li>
           <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-shield-check"></i> Safety</a></li>
@@ -55,8 +55,8 @@
       <main class="content flex-grow-1">
         <header class="topbar d-flex justify-content-between align-items-center p-3 p-md-4">
           <div>
-            <h2 class="h4 mb-1 fw-bold">O_way Admin Overview</h2>
-            <p class="text-muted mb-0">Manage your yellow 3-wheeler ride network in one place.</p>
+            <h2 id="pageTitle" class="h4 mb-1 fw-bold">O_way Admin Overview</h2>
+            <p id="pageDescription" class="text-muted mb-0">Manage your yellow 3-wheeler ride network in one place.</p>
           </div>
           <div class="d-flex gap-2">
             <button id="refreshBtn" class="btn btn-warning fw-semibold">Refresh Data</button>
@@ -64,7 +64,7 @@
           </div>
         </header>
 
-        <section class="px-3 px-md-4 pb-4">
+        <section id="dashboardPage" class="px-3 px-md-4 pb-4">
           <div class="row g-3 mb-4" id="statsGrid"></div>
 
           <div class="row g-3">
@@ -107,6 +107,34 @@
                   <li>Airport Link - Low Demand</li>
                 </ul>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="vehiclesPage" class="px-3 px-md-4 pb-4 d-none">
+          <div class="panel p-3 p-md-4 mb-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+              <div>
+                <h3 class="h5 mb-1 fw-bold">Vehicle Page</h3>
+                <p class="text-muted mb-0 small">Vehicle plate number, contact, vehicle status and address.</p>
+              </div>
+              <button id="loadVehiclesBtn" class="btn btn-outline-dark btn-sm fw-semibold">Load Vehicles from Spring Boot API</button>
+            </div>
+            <div id="vehicleApiNotice" class="alert alert-info py-2 px-3 small mb-3">
+              Waiting for API call.
+            </div>
+            <div class="table-responsive">
+              <table class="table align-middle vehicle-table">
+                <thead>
+                  <tr>
+                    <th>Plate Number</th>
+                    <th>Contact</th>
+                    <th>Status</th>
+                    <th>Address</th>
+                  </tr>
+                </thead>
+                <tbody id="vehicleTableBody"></tbody>
+              </table>
             </div>
           </div>
         </section>
