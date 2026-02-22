@@ -12,9 +12,10 @@ const liveTrips = [
   { id: 'TR-5024', driver: 'Sanjeewa Fernando', vehicle: 'TW-6252', status: 'In Progress', eta: '11 min' }
 ];
 
+const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
 const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
+const AUTH_COOKIE_KEY = 'oway_admin_token';
 
-const AUTH_KEY = 'oway_admin_logged_in';
 const loginView = document.getElementById('loginView');
 const dashboardView = document.getElementById('dashboardView');
 const loginForm = document.getElementById('loginForm');
@@ -31,6 +32,7 @@ const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
 const loadVehiclesBtn = document.getElementById('loadVehiclesBtn');
 const vehicleSearchInput = document.getElementById('vehicleSearchInput');
+const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
 let allVehicles = [];
 
@@ -104,6 +106,38 @@ function setVehicleNotice(type, message) {
   vehicleApiNotice.textContent = message;
 }
 
+function getCookie(name) {
+  const encodedName = `${encodeURIComponent(name)}=`;
+  const cookies = document.cookie ? document.cookie.split('; ') : [];
+
+  for (const cookie of cookies) {
+    if (cookie.startsWith(encodedName)) {
+      return decodeURIComponent(cookie.slice(encodedName.length));
+    }
+  }
+
+  return null;
+}
+
+function setAuthCookie(token) {
+  const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=${encodeURIComponent(token)}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
+}
+
+function clearAuthCookie() {
+  document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`;
+}
+
+function getTokenFromResponse(responseBody) {
+  return responseBody?.token
+    || responseBody?.accessToken
+    || responseBody?.jwt
+    || responseBody?.data?.token
+    || responseBody?.data?.accessToken
+    || null;
+}
+
 function renderVehicles(vehicles) {
   if (!vehicles.length) {
     vehicleTableBody.innerHTML = `
@@ -138,10 +172,27 @@ function filterVehicleList() {
 }
 
 async function loadVehiclesFromApi() {
+  const token = getCookie(AUTH_COOKIE_KEY);
+
+  if (!token) {
+    setVehicleNotice('warning', 'Please log in again. Missing auth token.');
+    showLogin();
+    return;
+  }
+
   setVehicleNotice('info', `Loading vehicles from ${VEHICLE_API_URL} ...`);
 
   try {
-    const response = await fetch(VEHICLE_API_URL);
+    const response = await fetch(VEHICLE_API_URL, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
     if (!response.ok) {
       throw new Error(`API failed with status ${response.status}`);
     }
@@ -217,34 +268,72 @@ function showLogin() {
   loginView.classList.remove('d-none');
 }
 
-function login(username, password) {
+function setLoginLoadingState(isLoading) {
+  loginSubmitBtn.disabled = isLoading;
+  loginSubmitBtn.textContent = isLoading ? 'Logging in...' : 'Login';
+}
+
+async function login(username, password) {
   if (!username || !password) {
-    return false;
+    throw new Error('Username and password are required.');
   }
 
-  localStorage.setItem(AUTH_KEY, 'true');
-  return true;
+  const response = await fetch(LOGIN_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, password })
+  });
+
+  let responseBody = {};
+
+  try {
+    responseBody = await response.json();
+  } catch {
+    responseBody = {};
+  }
+
+  if (!response.ok) {
+    const message = responseBody?.message || 'Invalid username or password.';
+    throw new Error(message);
+  }
+
+  const token = getTokenFromResponse(responseBody);
+
+  if (!token) {
+    throw new Error('Login succeeded but no JWT token was returned by API.');
+  }
+
+  setAuthCookie(token);
 }
 
 function logout() {
-  localStorage.removeItem(AUTH_KEY);
+  clearAuthCookie();
   showLogin();
   loginForm.reset();
+  loginError.classList.add('d-none');
+  setLoginLoadingState(false);
 }
 
-loginForm.addEventListener('submit', (event) => {
+loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value.trim();
 
-  if (login(username, password)) {
+  setLoginLoadingState(true);
+
+  try {
+    await login(username, password);
     loginError.classList.add('d-none');
     showDashboard();
-    return;
+  } catch (error) {
+    loginError.textContent = error.message;
+    loginError.classList.remove('d-none');
+  } finally {
+    setLoginLoadingState(false);
   }
-
-  loginError.classList.remove('d-none');
 });
 
 dashboardNav.addEventListener('click', (event) => {
@@ -262,7 +351,7 @@ refreshBtn.addEventListener('click', refreshDashboard);
 logoutBtn.addEventListener('click', logout);
 loadVehiclesBtn.addEventListener('click', loadVehiclesFromApi);
 
-if (localStorage.getItem(AUTH_KEY) === 'true') {
+if (getCookie(AUTH_COOKIE_KEY)) {
   showDashboard();
 } else {
   showLogin();
