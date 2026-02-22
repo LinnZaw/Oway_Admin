@@ -12,28 +12,7 @@ const liveTrips = [
   { id: 'TR-5024', driver: 'Sanjeewa Fernando', vehicle: 'TW-6252', status: 'In Progress', eta: '11 min' }
 ];
 
-const exampleVehicleData = [
-  {
-    plateNumber: 'WP-TW-4832',
-    contact: '+94 77 123 4567',
-    status: 'Available',
-    address: 'Town Hall, Colombo 07'
-  },
-  {
-    plateNumber: 'CP-TW-9921',
-    contact: '+94 71 987 2210',
-    status: 'On Trip',
-    address: 'Peradeniya Road, Kandy'
-  },
-  {
-    plateNumber: 'SP-TW-1154',
-    contact: '+94 75 445 7788',
-    status: 'Offline',
-    address: 'Matara Bus Stand, Matara'
-  }
-];
-
-const SPRING_BOOT_API_URL = 'http://localhost:8080/api/vehicles';
+const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
 
 const AUTH_KEY = 'oway_admin_logged_in';
 const loginView = document.getElementById('loginView');
@@ -51,10 +30,13 @@ const pageDescription = document.getElementById('pageDescription');
 const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
 const loadVehiclesBtn = document.getElementById('loadVehiclesBtn');
+const vehicleSearchInput = document.getElementById('vehicleSearchInput');
+
+let allVehicles = [];
 
 function renderStats() {
   const statsGrid = document.getElementById('statsGrid');
-  statsGrid.innerHTML = stats.map(item => `
+  statsGrid.innerHTML = stats.map((item) => `
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="panel stat-card p-3 bg-${item.tone}-subtle border-0">
         <div class="label">${item.label}</div>
@@ -79,7 +61,7 @@ function statusBadge(status) {
 
 function renderTrips() {
   const body = document.getElementById('tripTableBody');
-  body.innerHTML = liveTrips.map(trip => `
+  body.innerHTML = liveTrips.map((trip) => `
     <tr>
       <td class="fw-semibold">${trip.id}</td>
       <td>${trip.driver}</td>
@@ -91,20 +73,48 @@ function renderTrips() {
 }
 
 function vehicleStatusBadge(status) {
-  switch (status) {
-    case 'Available':
-      return 'bg-success';
-    case 'On Trip':
-      return 'bg-warning text-dark';
-    case 'Offline':
-      return 'bg-secondary';
-    default:
-      return 'bg-info text-dark';
+  const currentStatus = (status || '').toLowerCase();
+
+  if (currentStatus.includes('available') || currentStatus.includes('active')) {
+    return 'bg-success';
   }
+
+  if (currentStatus.includes('trip') || currentStatus.includes('busy')) {
+    return 'bg-warning text-dark';
+  }
+
+  if (currentStatus.includes('offline') || currentStatus.includes('inactive')) {
+    return 'bg-secondary';
+  }
+
+  return 'bg-info text-dark';
+}
+
+function mapVehicle(rawVehicle) {
+  return {
+    plateNumber: rawVehicle.plateNumber || rawVehicle.vehiclePlateNumber || rawVehicle.plateNo || 'N/A',
+    contact: rawVehicle.contact || rawVehicle.phone || rawVehicle.mobile || 'N/A',
+    status: rawVehicle.status || rawVehicle.vehicleStatus || 'Unknown',
+    address: rawVehicle.address || rawVehicle.currentAddress || rawVehicle.location || 'N/A'
+  };
+}
+
+function setVehicleNotice(type, message) {
+  vehicleApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
+  vehicleApiNotice.textContent = message;
 }
 
 function renderVehicles(vehicles) {
-  vehicleTableBody.innerHTML = vehicles.map(vehicle => `
+  if (!vehicles.length) {
+    vehicleTableBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-muted py-4">No vehicles found.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  vehicleTableBody.innerHTML = vehicles.map((vehicle) => `
     <tr>
       <td class="fw-semibold">${vehicle.plateNumber}</td>
       <td>${vehicle.contact}</td>
@@ -114,24 +124,38 @@ function renderVehicles(vehicles) {
   `).join('');
 }
 
+function filterVehicleList() {
+  const query = vehicleSearchInput.value.trim().toLowerCase();
+
+  const filteredVehicles = allVehicles.filter((vehicle) => (
+    vehicle.plateNumber.toLowerCase().includes(query)
+      || vehicle.contact.toLowerCase().includes(query)
+      || vehicle.status.toLowerCase().includes(query)
+      || vehicle.address.toLowerCase().includes(query)
+  ));
+
+  renderVehicles(filteredVehicles);
+}
+
 async function loadVehiclesFromApi() {
-  vehicleApiNotice.className = 'alert alert-info py-2 px-3 small mb-3';
-  vehicleApiNotice.textContent = `Loading vehicles from ${SPRING_BOOT_API_URL} ...`;
+  setVehicleNotice('info', `Loading vehicles from ${VEHICLE_API_URL} ...`);
 
   try {
-    const response = await fetch(SPRING_BOOT_API_URL);
+    const response = await fetch(VEHICLE_API_URL);
     if (!response.ok) {
       throw new Error(`API failed with status ${response.status}`);
     }
 
-    const vehicles = await response.json();
-    renderVehicles(vehicles);
-    vehicleApiNotice.className = 'alert alert-success py-2 px-3 small mb-3';
-    vehicleApiNotice.textContent = `Loaded ${vehicles.length} vehicles from Spring Boot API.`;
+    const responseBody = await response.json();
+    const list = Array.isArray(responseBody) ? responseBody : (responseBody.data || []);
+    allVehicles = list.map(mapVehicle);
+
+    filterVehicleList();
+    setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles from API.`);
   } catch (error) {
-    renderVehicles(exampleVehicleData);
-    vehicleApiNotice.className = 'alert alert-warning py-2 px-3 small mb-3';
-    vehicleApiNotice.textContent = `Could not reach API. Showing example list data. (${error.message})`;
+    allVehicles = [];
+    renderVehicles([]);
+    setVehicleNotice('danger', `Failed to load vehicles from API. ${error.message}`);
   }
 }
 
@@ -151,8 +175,12 @@ function showVehiclesPage() {
   dashboardNav.classList.remove('active');
   vehiclesNav.classList.add('active');
   pageTitle.textContent = 'Vehicles';
-  pageDescription.textContent = 'View live fleet vehicle details and status from the backend service.';
+  pageDescription.textContent = 'Search and monitor live vehicle records from the admin API.';
   refreshBtn.classList.add('d-none');
+
+  if (!allVehicles.length) {
+    loadVehiclesFromApi();
+  }
 }
 
 function sendAlert() {
@@ -179,9 +207,8 @@ function showDashboard() {
   dashboardView.classList.remove('d-none');
   renderStats();
   renderTrips();
-  renderVehicles(exampleVehicleData);
-  vehicleApiNotice.className = 'alert alert-secondary py-2 px-3 small mb-3';
-  vehicleApiNotice.textContent = 'Showing example list data. Click "Load Vehicles from Spring Boot API" to fetch live data.';
+  renderVehicles([]);
+  setVehicleNotice('info', 'Open Vehicles page to load data from API.');
   showDashboardPage();
 }
 
@@ -230,6 +257,7 @@ vehiclesNav.addEventListener('click', (event) => {
   showVehiclesPage();
 });
 
+vehicleSearchInput.addEventListener('input', filterVehicleList);
 refreshBtn.addEventListener('click', refreshDashboard);
 logoutBtn.addEventListener('click', logout);
 loadVehiclesBtn.addEventListener('click', loadVehiclesFromApi);

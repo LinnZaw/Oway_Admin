@@ -113,16 +113,23 @@
 
         <section id="vehiclesPage" class="px-3 px-md-4 pb-4 d-none">
           <div class="panel p-3 p-md-4 mb-4">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
               <div>
-                <h3 class="h5 mb-1 fw-bold">Vehicle Page</h3>
-                <p class="text-muted mb-0 small">Vehicle plate number, contact, vehicle status and address.</p>
+                <h3 class="h5 mb-1 fw-bold">Vehicle List</h3>
+                <p class="text-muted mb-0 small">Vehicle plate number, contact, vehicle status and address from API.</p>
               </div>
-              <button id="loadVehiclesBtn" class="btn btn-outline-dark btn-sm fw-semibold">Load Vehicles from Spring Boot API</button>
+              <button id="loadVehiclesBtn" class="btn btn-outline-dark btn-sm fw-semibold">Reload Vehicles</button>
             </div>
+
+            <div class="input-group mb-3">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input id="vehicleSearchInput" type="text" class="form-control" placeholder="Search by plate number, contact, status or address" />
+            </div>
+
             <div id="vehicleApiNotice" class="alert alert-info py-2 px-3 small mb-3">
-              Waiting for API call.
+              Loading vehicles from API...
             </div>
+
             <div class="table-responsive">
               <table class="table align-middle vehicle-table">
                 <thead>
