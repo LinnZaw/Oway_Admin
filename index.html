@@ -44,8 +44,9 @@
 
         <ul class="nav flex-column gap-1">
           <li class="nav-item"><a id="dashboardNav" class="nav-link active" href="#"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-people"></i> Drivers</a></li>
+          <li class="nav-item"><a id="usersNav" class="nav-link" href="#"><i class="bi bi-people"></i> Users</a></li>
           <li class="nav-item"><a id="vehiclesNav" class="nav-link" href="../Oway_Admin/getVehicle.html"><i class="bi bi-car-front"></i> Vehicles</a></li>
+          <li class="nav-item"><a id="rolesNav" class="nav-link" href="#"><i class="bi bi-person-badge"></i> Roles</a></li>
           <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-map"></i> Trips</a></li>
           <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-cash-stack"></i> Payments</a></li>
           <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-shield-check"></i> Safety</a></li>
@@ -141,6 +142,81 @@
                   </tr>
                 </thead>
                 <tbody id="vehicleTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
+        <section id="usersPage" class="px-3 px-md-4 pb-4 d-none">
+          <div class="panel p-3 p-md-4 mb-4">
+            <div class="mb-3">
+              <h3 class="h5 mb-1 fw-bold">User Management</h3>
+              <p class="text-muted mb-0 small">Search users by name or roles and open user profiles.</p>
+            </div>
+
+            <div class="input-group mb-3">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input id="userSearchInput" type="text" class="form-control" placeholder="Search by name or roles" />
+            </div>
+
+            <div id="userApiNotice" class="alert alert-info py-2 px-3 small mb-3">
+              Open Users page to load data from API.
+            </div>
+
+            <div class="table-responsive mb-3">
+              <table class="table align-middle">
+                <thead>
+                  <tr>
+                    <th style="width: 80px;">No</th>
+                    <th>Name</th>
+                    <th>Roles</th>
+                    <th style="width: 180px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="userTableBody"></tbody>
+              </table>
+            </div>
+
+            <div id="userProfileCard" class="border rounded-3 p-3 d-none">
+              <h4 class="h6 fw-bold mb-3">User Profile</h4>
+              <div id="userProfileBody" class="small text-muted"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="rolesPage" class="px-3 px-md-4 pb-4 d-none">
+          <div class="panel p-3 p-md-4 mb-4">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+              <div>
+                <h3 class="h5 mb-1 fw-bold">Role Management</h3>
+                <p class="text-muted mb-0 small">Create and view admin roles.</p>
+              </div>
+              <button id="addRoleBtn" class="btn btn-dark btn-sm fw-semibold">Add Role</button>
+            </div>
+
+            <form id="roleCreateForm" class="border rounded-3 p-3 mb-3 d-none" novalidate>
+              <label for="roleNameInput" class="form-label fw-semibold">Role Name</label>
+              <div class="input-group">
+                <input id="roleNameInput" type="text" class="form-control" placeholder="Enter role name" required />
+                <button id="saveRoleBtn" type="submit" class="btn btn-warning fw-semibold">Create Role</button>
+                <button id="cancelRoleBtn" type="button" class="btn btn-outline-secondary">Cancel</button>
+              </div>
+            </form>
+
+            <div id="roleApiNotice" class="alert alert-info py-2 px-3 small mb-3">
+              Open Roles page to load data from API.
+            </div>
+
+            <div class="table-responsive">
+              <table class="table align-middle">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Role Name</th>
+                  </tr>
+                </thead>
+                <tbody id="roleTableBody"></tbody>
               </table>
             </div>
           </div>

@@ -14,7 +14,11 @@ const liveTrips = [
 
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
 const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
-const AUTH_COOKIE_KEY = 'oway_admin_token';
+const ROLES_API_URL = 'http://localhost:8000/api/admin/getRoles';
+const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
+const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
+const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
+const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 const loginView = document.getElementById('loginView');
 const dashboardView = document.getElementById('dashboardView');
@@ -26,15 +30,34 @@ const dashboardPage = document.getElementById('dashboardPage');
 const vehiclesPage = document.getElementById('vehiclesPage');
 const dashboardNav = document.getElementById('dashboardNav');
 const vehiclesNav = document.getElementById('vehiclesNav');
+const usersNav = document.getElementById('usersNav');
+const rolesNav = document.getElementById('rolesNav');
 const pageTitle = document.getElementById('pageTitle');
 const pageDescription = document.getElementById('pageDescription');
 const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
 const loadVehiclesBtn = document.getElementById('loadVehiclesBtn');
 const vehicleSearchInput = document.getElementById('vehicleSearchInput');
+const usersPage = document.getElementById('usersPage');
+const userTableBody = document.getElementById('userTableBody');
+const userApiNotice = document.getElementById('userApiNotice');
+const userSearchInput = document.getElementById('userSearchInput');
+const userProfileCard = document.getElementById('userProfileCard');
+const userProfileBody = document.getElementById('userProfileBody');
+const rolesPage = document.getElementById('rolesPage');
+const roleTableBody = document.getElementById('roleTableBody');
+const roleApiNotice = document.getElementById('roleApiNotice');
+const addRoleBtn = document.getElementById('addRoleBtn');
+const roleCreateForm = document.getElementById('roleCreateForm');
+const roleNameInput = document.getElementById('roleNameInput');
+const saveRoleBtn = document.getElementById('saveRoleBtn');
+const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
 let allVehicles = [];
+let allUsers = [];
+let allProfiles = [];
+let allRoles = [];
 
 function renderStats() {
   const statsGrid = document.getElementById('statsGrid');
@@ -106,38 +129,16 @@ function setVehicleNotice(type, message) {
   vehicleApiNotice.textContent = message;
 }
 
-function getCookie(name) {
-  const encodedName = `${encodeURIComponent(name)}=`;
-  const cookies = document.cookie ? document.cookie.split('; ') : [];
-
-  for (const cookie of cookies) {
-    if (cookie.startsWith(encodedName)) {
-      return decodeURIComponent(cookie.slice(encodedName.length));
-    }
-  }
-
-  return null;
-}
-
 function getStoredToken() {
-  const cookieToken = getCookie(AUTH_COOKIE_KEY);
-  if (cookieToken) {
-    return cookieToken;
-  }
-
-  return localStorage.getItem(AUTH_COOKIE_KEY);
+  return localStorage.getItem(AUTH_STORAGE_KEY);
 }
 
-function setAuthCookie(token) {
-  const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=${encodeURIComponent(token)}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
-  localStorage.setItem(AUTH_COOKIE_KEY, token);
+function setStoredToken(token) {
+  localStorage.setItem(AUTH_STORAGE_KEY, token);
 }
 
-function clearAuthCookie() {
-  document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`;
-  localStorage.removeItem(AUTH_COOKIE_KEY);
+function clearStoredToken() {
+  localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
 function getTokenFromResponse(responseBody) {
@@ -224,8 +225,12 @@ async function loadVehiclesFromApi() {
 function showDashboardPage() {
   dashboardPage.classList.remove('d-none');
   vehiclesPage.classList.add('d-none');
+  usersPage.classList.add('d-none');
+  rolesPage.classList.add('d-none');
   dashboardNav.classList.add('active');
   vehiclesNav.classList.remove('active');
+  usersNav.classList.remove('active');
+  rolesNav.classList.remove('active');
   pageTitle.textContent = 'O_way Admin Overview';
   pageDescription.textContent = 'Manage your yellow 3-wheeler ride network in one place.';
   refreshBtn.classList.remove('d-none');
@@ -235,8 +240,12 @@ function showDashboardPage() {
 function showVehiclesPage() {
   dashboardPage.classList.add('d-none');
   vehiclesPage.classList.remove('d-none');
+  usersPage.classList.add('d-none');
+  rolesPage.classList.add('d-none');
   dashboardNav.classList.remove('active');
   vehiclesNav.classList.add('active');
+  usersNav.classList.remove('active');
+  rolesNav.classList.remove('active');
   pageTitle.textContent = 'Vehicles';
   pageDescription.textContent = 'Search and monitor live vehicle records from the admin API.';
   refreshBtn.classList.add('d-none');
@@ -244,6 +253,349 @@ function showVehiclesPage() {
 
   if (!allVehicles.length) {
     loadVehiclesFromApi();
+  }
+}
+
+
+
+function setUserNotice(type, message) {
+  userApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
+  userApiNotice.textContent = message;
+}
+
+function normalizeUserRoles(rawUser) {
+  const rawRoles = rawUser.roles ?? rawUser.role ?? rawUser.userRoles ?? rawUser.roleNames ?? [];
+
+  if (Array.isArray(rawRoles)) {
+    return rawRoles.map((role) => {
+      if (typeof role === 'string') {
+        return role;
+      }
+
+      return role.name || role.roleName || role.title || String(role.id || '').trim();
+    }).filter(Boolean);
+  }
+
+  if (typeof rawRoles === 'string') {
+    return rawRoles.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+
+  return [];
+}
+
+function mapUser(rawUser) {
+  return {
+    id: rawUser.id ?? rawUser.userId ?? rawUser._id ?? null,
+    name: rawUser.name || rawUser.fullName || rawUser.username || 'Unknown',
+    roles: normalizeUserRoles(rawUser)
+  };
+}
+
+function renderUsers(users) {
+  if (!users.length) {
+    userTableBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-muted py-4">No users found.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  userTableBody.innerHTML = users.map((user, index) => `
+    <tr>
+      <td class="fw-semibold">${index + 1}</td>
+      <td>${user.name}</td>
+      <td>${user.roles.length ? user.roles.join(', ') : 'No roles'}</td>
+      <td>
+        <button class="btn btn-outline-dark btn-sm view-user-profile-btn" data-user-id="${user.id ?? ''}" data-user-name="${user.name}">View User Profile</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterUsers() {
+  const query = userSearchInput.value.trim().toLowerCase();
+
+  if (!query) {
+    renderUsers(allUsers);
+    return;
+  }
+
+  const filteredUsers = allUsers.filter((user) => {
+    const roleText = user.roles.join(' ').toLowerCase();
+
+    return user.name.toLowerCase().includes(query) || roleText.includes(query);
+  });
+
+  renderUsers(filteredUsers);
+}
+
+function renderUserProfile(profile, userName) {
+  if (!profile) {
+    userProfileBody.innerHTML = `<p class="mb-0">No profile found for ${userName}.</p>`;
+    userProfileCard.classList.remove('d-none');
+    return;
+  }
+
+  const fields = [
+    ['Name', profile.name || profile.fullName || userName || 'N/A'],
+    ['Email', profile.email || 'N/A'],
+    ['Phone', profile.phone || profile.contact || 'N/A'],
+    ['Address', profile.address || 'N/A'],
+    ['Roles', Array.isArray(profile.roles) ? profile.roles.map((role) => role.name || role.roleName || role).join(', ') : (profile.roles || profile.role || 'N/A')]
+  ];
+
+  userProfileBody.innerHTML = fields.map(([label, value]) => `
+    <div class="mb-2">
+      <span class="fw-semibold text-dark">${label}:</span>
+      <span>${value}</span>
+    </div>
+  `).join('');
+  userProfileCard.classList.remove('d-none');
+}
+
+async function loadUsersFromApi() {
+  const token = getStoredToken();
+
+  if (!token) {
+    setUserNotice('warning', 'Please log in again. Missing auth token.');
+    showLogin();
+    return;
+  }
+
+  setUserNotice('info', `Loading users from ${USERS_API_URL} ...`);
+
+  try {
+    const response = await fetch(USERS_API_URL, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`API failed with status ${response.status}`);
+    }
+
+    const responseBody = await response.json();
+    const list = Array.isArray(responseBody) ? responseBody : (responseBody.data || []);
+    allUsers = list.map(mapUser);
+    filterUsers();
+    setUserNotice('success', `Loaded ${allUsers.length} users from API.`);
+  } catch (error) {
+    allUsers = [];
+    renderUsers([]);
+    setUserNotice('danger', `Failed to load users from API. ${error.message}`);
+  }
+}
+
+async function loadProfilesFromApi() {
+  if (allProfiles.length) {
+    return allProfiles;
+  }
+
+  const token = getStoredToken();
+
+  if (!token) {
+    setUserNotice('warning', 'Please log in again. Missing auth token.');
+    showLogin();
+    return [];
+  }
+
+  const response = await fetch(PROFILES_API_URL, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load profiles. Status ${response.status}`);
+  }
+
+  const responseBody = await response.json();
+  const list = Array.isArray(responseBody) ? responseBody : (responseBody.data || []);
+  allProfiles = list;
+  return allProfiles;
+}
+
+async function viewUserProfile(userId, userName) {
+  try {
+    const profiles = await loadProfilesFromApi();
+
+    const profile = profiles.find((item) => (
+      String(item.id ?? item.userId ?? item._id ?? '') === String(userId)
+    )) || profiles.find((item) => (
+      (item.name || item.fullName || '').toLowerCase() === String(userName || '').toLowerCase()
+    ));
+
+    renderUserProfile(profile, userName);
+  } catch (error) {
+    setUserNotice('danger', error.message);
+  }
+}
+
+function showUsersPage() {
+  dashboardPage.classList.add('d-none');
+  vehiclesPage.classList.add('d-none');
+  rolesPage.classList.add('d-none');
+  usersPage.classList.remove('d-none');
+  dashboardNav.classList.remove('active');
+  vehiclesNav.classList.remove('active');
+  usersNav.classList.add('active');
+  rolesNav.classList.remove('active');
+  pageTitle.textContent = 'Users';
+  pageDescription.textContent = 'Search users by name or role and open profiles.';
+  refreshBtn.classList.add('d-none');
+  window.location.hash = 'users';
+
+  if (!allUsers.length) {
+    loadUsersFromApi();
+  } else {
+    filterUsers();
+  }
+}
+
+function setRoleNotice(type, message) {
+  roleApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
+  roleApiNotice.textContent = message;
+}
+
+function mapRole(rawRole) {
+  return {
+    id: rawRole.id ?? rawRole.roleId ?? 'N/A',
+    name: rawRole.name || rawRole.roleName || 'Unknown'
+  };
+}
+
+function renderRoles(roles) {
+  if (!roles.length) {
+    roleTableBody.innerHTML = `
+      <tr>
+        <td colspan="2" class="text-center text-muted py-4">No roles found.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  roleTableBody.innerHTML = roles.map((role) => `
+    <tr>
+      <td class="fw-semibold">${role.id}</td>
+      <td>${role.name}</td>
+    </tr>
+  `).join('');
+}
+
+function setRoleFormVisible(isVisible) {
+  roleCreateForm.classList.toggle('d-none', !isVisible);
+
+  if (!isVisible) {
+    roleCreateForm.reset();
+  }
+}
+
+function setRoleCreateLoadingState(isLoading) {
+  saveRoleBtn.disabled = isLoading;
+  cancelRoleBtn.disabled = isLoading;
+  roleNameInput.disabled = isLoading;
+  saveRoleBtn.textContent = isLoading ? 'Creating...' : 'Create Role';
+}
+
+async function loadRolesFromApi() {
+  const token = getStoredToken();
+
+  if (!token) {
+    setRoleNotice('warning', 'Please log in again. Missing auth token.');
+    showLogin();
+    return;
+  }
+
+  setRoleNotice('info', `Loading roles from ${ROLES_API_URL} ...`);
+
+  try {
+    const response = await fetch(ROLES_API_URL, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`API failed with status ${response.status}`);
+    }
+
+    const responseBody = await response.json();
+    const list = Array.isArray(responseBody) ? responseBody : (responseBody.data || []);
+    allRoles = list.map(mapRole);
+    renderRoles(allRoles);
+    setRoleNotice('success', `Loaded ${allRoles.length} roles from API.`);
+  } catch (error) {
+    allRoles = [];
+    renderRoles([]);
+    setRoleNotice('danger', `Failed to load roles from API. ${error.message}`);
+  }
+}
+
+async function createRole(roleName) {
+  const token = getStoredToken();
+
+  if (!token) {
+    setRoleNotice('warning', 'Please log in again. Missing auth token.');
+    showLogin();
+    return;
+  }
+
+  if (!roleName) {
+    throw new Error('Role name is required.');
+  }
+
+  const response = await fetch(CREATE_ROLE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ roleName: roleName })
+  });
+
+  let responseBody = {};
+
+  try {
+    responseBody = await response.json();
+  } catch {
+    responseBody = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(responseBody?.message || `Failed to create role. Status ${response.status}`);
+  }
+
+  return responseBody;
+}
+
+function showRolesPage() {
+  dashboardPage.classList.add('d-none');
+  vehiclesPage.classList.add('d-none');
+  usersPage.classList.add('d-none');
+  rolesPage.classList.remove('d-none');
+  dashboardNav.classList.remove('active');
+  vehiclesNav.classList.remove('active');
+  usersNav.classList.remove('active');
+  rolesNav.classList.add('active');
+  pageTitle.textContent = 'Roles';
+  pageDescription.textContent = 'Create and manage admin roles.';
+  refreshBtn.classList.add('d-none');
+  window.location.hash = 'roles';
+
+  renderRoles(allRoles);
+
+  if (!allRoles.length) {
+    loadRolesFromApi();
   }
 }
 
@@ -276,6 +628,16 @@ function showDashboard() {
 
   if (window.location.hash === '#vehicles') {
     showVehiclesPage();
+    return;
+  }
+
+  if (window.location.hash === '#roles') {
+    showRolesPage();
+    return;
+  }
+
+  if (window.location.hash === '#users') {
+    showUsersPage();
     return;
   }
 
@@ -324,15 +686,18 @@ async function login(name, password) {
     throw new Error('Login succeeded but no JWT token was returned by API.');
   }
 
-  setAuthCookie(token);
+  setStoredToken(token);
 }
 
 function logout() {
-  clearAuthCookie();
+  clearStoredToken();
   showLogin();
   loginForm.reset();
   loginError.classList.add('d-none');
   setLoginLoadingState(false);
+  setRoleFormVisible(false);
+  userProfileCard.classList.add('d-none');
+  userProfileBody.innerHTML = '';
 }
 
 loginForm.addEventListener('submit', async (event) => {
@@ -365,7 +730,58 @@ vehiclesNav.addEventListener('click', (event) => {
   showVehiclesPage();
 });
 
+usersNav.addEventListener('click', (event) => {
+  event.preventDefault();
+  showUsersPage();
+});
+
+rolesNav.addEventListener('click', (event) => {
+  event.preventDefault();
+  showRolesPage();
+});
+
+addRoleBtn.addEventListener('click', () => {
+  setRoleFormVisible(true);
+  roleNameInput.focus();
+});
+
+cancelRoleBtn.addEventListener('click', () => {
+  setRoleFormVisible(false);
+});
+
+roleCreateForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const roleName = roleNameInput.value.trim();
+  setRoleCreateLoadingState(true);
+
+  try {
+    await createRole(roleName);
+    setRoleNotice('success', `Role "${roleName}" created successfully.`);
+    setRoleFormVisible(false);
+    await loadRolesFromApi();
+  } catch (error) {
+    setRoleNotice('danger', error.message);
+  } finally {
+    setRoleCreateLoadingState(false);
+  }
+});
+
 vehicleSearchInput.addEventListener('input', filterVehicleList);
+userSearchInput.addEventListener('input', filterUsers);
+
+userTableBody.addEventListener('click', (event) => {
+  const button = event.target.closest('.view-user-profile-btn');
+
+  if (!button) {
+    return;
+  }
+
+  const userId = button.dataset.userId || '';
+  const userName = button.dataset.userName || 'Selected user';
+  viewUserProfile(userId, userName);
+});
+
 refreshBtn.addEventListener('click', refreshDashboard);
 logoutBtn.addEventListener('click', logout);
 loadVehiclesBtn.addEventListener('click', loadVehiclesFromApi);
