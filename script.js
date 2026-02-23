@@ -329,6 +329,11 @@ function normalizeUserRoles(rawUser) {
     return rawRoles.split(',').map((item) => item.trim()).filter(Boolean);
   }
 
+  if (typeof rawRoles === 'object') {
+    const mappedRole = rawRoles?.name || rawRoles?.roleName || rawRoles?.title || rawRoles?.label || rawRoles?.role;
+    return mappedRole ? [String(mappedRole).trim()] : [];
+  }
+
   return [];
 }
 
@@ -388,13 +393,32 @@ function resolveAssignedRoles(rawUser) {
 }
 
 function mapUser(rawUser) {
+  const embeddedProfile = rawUser.profile || {};
+
   return {
     id: rawUser.id ?? rawUser.userId ?? rawUser._id ?? rawUser.uuid ?? null,
-    name: rawUser.name || rawUser.fullName || rawUser.username || rawUser.email || 'Unknown',
-    email: rawUser.email || 'N/A',
+    name: rawUser.name || rawUser.fullName || rawUser.username || embeddedProfile.fullName || rawUser.email || 'Unknown',
+    email: rawUser.email || embeddedProfile.email || 'N/A',
     roles: resolveAssignedRoles(rawUser),
     raw: rawUser
   };
+}
+
+function getDisplayLocation(profile = {}) {
+  const directLocation = profile.address || profile.locationName || profile.city || profile.location;
+
+  if (typeof directLocation === 'string' && directLocation.trim()) {
+    return directLocation;
+  }
+
+  const latitude = profile.latitude ?? profile.location?.latitude;
+  const longitude = profile.longitude ?? profile.location?.longitude;
+
+  if (latitude !== undefined && latitude !== null && longitude !== undefined && longitude !== null) {
+    return `${latitude}, ${longitude}`;
+  }
+
+  return 'N/A';
 }
 
 function renderUsers(users) {
@@ -447,27 +471,46 @@ function filterUsers() {
 }
 
 function renderUserProfile(profile, userName) {
-  const safeProfile = profile || {};
+  const safeUser = profile || {};
+  const embeddedProfile = safeUser.profile || {};
 
-  const roleValue = Array.isArray(safeProfile.roles)
-    ? safeProfile.roles.map((role) => role?.name || role?.roleName || role).filter(Boolean).join(', ')
-    : (safeProfile.roles || safeProfile.role || safeProfile.roleName || 'N/A');
+  const roleList = normalizeUserRoles(safeUser);
+  const roleValue = roleList.length ? roleList.join(', ') : 'No roles assigned';
 
-  const fields = [
-    ['Name', safeProfile.name || safeProfile.fullName || userName || 'N/A'],
-    ['Email', safeProfile.email || 'N/A'],
-    ['Phone', safeProfile.phone || safeProfile.contact || safeProfile.mobile || 'N/A'],
-    ['Address', safeProfile.address || safeProfile.location || 'N/A'],
-    ['Roles', roleValue],
-    ['Status', safeProfile.status || safeProfile.accountStatus || 'N/A']
-  ];
+  const fullName = embeddedProfile.fullName || safeUser.fullName || safeUser.name || userName || 'N/A';
+  const email = embeddedProfile.email || safeUser.email || 'N/A';
+  const phone = embeddedProfile.contact || safeUser.phone || safeUser.contact || safeUser.mobile || 'N/A';
+  const dob = embeddedProfile.dob || safeUser.dob || 'N/A';
+  const gender = embeddedProfile.gender || safeUser.gender || 'N/A';
+  const location = getDisplayLocation(embeddedProfile);
+  const profilePic = embeddedProfile.profilePic || 'nopic';
+  const status = safeUser.status || safeUser.accountStatus || (safeUser.hasProfile ? 'Profile linked' : 'Profile pending');
 
-  userProfileBody.innerHTML = fields.map(([label, value]) => `
-    <div class="mb-2">
-      <span class="fw-semibold text-dark">${label}:</span>
-      <span>${value}</span>
+  userProfileBody.innerHTML = `
+    <div class="user-profile-popup">
+      <div class="user-profile-header">
+        <div class="user-avatar">${fullName.charAt(0).toUpperCase()}</div>
+        <div>
+          <h5 class="mb-1">${fullName}</h5>
+          <p class="text-muted mb-2">${email}</p>
+          <span class="badge text-bg-warning text-dark fw-semibold">${roleValue}</span>
+        </div>
+      </div>
+      <div class="user-profile-grid">
+        <div class="profile-item"><span class="label">User ID</span><span class="value">${safeUser.id || 'N/A'}</span></div>
+        <div class="profile-item"><span class="label">Phone</span><span class="value">${phone}</span></div>
+        <div class="profile-item"><span class="label">Date of Birth</span><span class="value">${dob}</span></div>
+        <div class="profile-item"><span class="label">Gender</span><span class="value text-capitalize">${gender}</span></div>
+        <div class="profile-item"><span class="label">Location</span><span class="value">${location}</span></div>
+        <div class="profile-item"><span class="label">Profile Picture</span><span class="value">${profilePic}</span></div>
+      </div>
+      <div class="user-profile-footer">
+        <span class="text-muted">Account Status</span>
+        <span class="badge rounded-pill text-bg-light border">${status}</span>
+      </div>
     </div>
-  `).join('');
+  `;
+
   if (userProfileModal) {
     userProfileModal.show();
   }
@@ -567,6 +610,8 @@ async function viewUserProfile(userId, userName, userEmail = '') {
       name: fallbackUser?.name || userName,
       email: fallbackUser?.email || userEmail,
       roles: fallbackUser?.roles || [],
+      profile: fallbackUser?.raw?.profile || {},
+      hasProfile: fallbackUser?.raw?.hasProfile,
       status: 'Profile details limited by API permission'
     }, userName);
 

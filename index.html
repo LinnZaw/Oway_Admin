@@ -180,13 +180,13 @@
 
             <!-- User profile is now shown in a popup modal for better focus -->
             <div class="modal fade" id="userProfileModal" tabindex="-1" aria-labelledby="userProfileModalLabel" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg">
-                  <div class="modal-header">
-                    <h4 id="userProfileModalLabel" class="modal-title h6 fw-bold mb-0">User Profile</h4>
+              <div class="modal-dialog modal-dialog-centered modal-lg user-profile-modal-dialog">
+                <div class="modal-content border-0 shadow-lg user-profile-modal-content">
+                  <div class="modal-header user-profile-modal-header">
+                    <h4 id="userProfileModalLabel" class="modal-title h5 fw-bold mb-0"><i class="bi bi-person-badge-fill me-2 text-warning"></i>User Profile</h4>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                   </div>
-                  <div class="modal-body">
+                  <div class="modal-body user-profile-modal-body">
                     <div id="userProfileBody" class="small text-muted"></div>
                   </div>
                 </div>
