@@ -14,7 +14,9 @@ const liveTrips = [
 
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
 const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
-const AUTH_COOKIE_KEY = 'oway_admin_token';
+const ROLES_API_URL = 'http://localhost:8000/api/admin/getRoles';
+const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
+const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 const loginView = document.getElementById('loginView');
 const dashboardView = document.getElementById('dashboardView');
@@ -26,15 +28,25 @@ const dashboardPage = document.getElementById('dashboardPage');
 const vehiclesPage = document.getElementById('vehiclesPage');
 const dashboardNav = document.getElementById('dashboardNav');
 const vehiclesNav = document.getElementById('vehiclesNav');
+const rolesNav = document.getElementById('rolesNav');
 const pageTitle = document.getElementById('pageTitle');
 const pageDescription = document.getElementById('pageDescription');
 const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
 const loadVehiclesBtn = document.getElementById('loadVehiclesBtn');
 const vehicleSearchInput = document.getElementById('vehicleSearchInput');
+const rolesPage = document.getElementById('rolesPage');
+const roleTableBody = document.getElementById('roleTableBody');
+const roleApiNotice = document.getElementById('roleApiNotice');
+const addRoleBtn = document.getElementById('addRoleBtn');
+const roleCreateForm = document.getElementById('roleCreateForm');
+const roleNameInput = document.getElementById('roleNameInput');
+const saveRoleBtn = document.getElementById('saveRoleBtn');
+const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
 let allVehicles = [];
+let allRoles = [];
 
 function renderStats() {
   const statsGrid = document.getElementById('statsGrid');
@@ -106,38 +118,16 @@ function setVehicleNotice(type, message) {
   vehicleApiNotice.textContent = message;
 }
 
-function getCookie(name) {
-  const encodedName = `${encodeURIComponent(name)}=`;
-  const cookies = document.cookie ? document.cookie.split('; ') : [];
-
-  for (const cookie of cookies) {
-    if (cookie.startsWith(encodedName)) {
-      return decodeURIComponent(cookie.slice(encodedName.length));
-    }
-  }
-
-  return null;
-}
-
 function getStoredToken() {
-  const cookieToken = getCookie(AUTH_COOKIE_KEY);
-  if (cookieToken) {
-    return cookieToken;
-  }
-
-  return localStorage.getItem(AUTH_COOKIE_KEY);
+  return localStorage.getItem(AUTH_STORAGE_KEY);
 }
 
-function setAuthCookie(token) {
-  const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=${encodeURIComponent(token)}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
-  localStorage.setItem(AUTH_COOKIE_KEY, token);
+function setStoredToken(token) {
+  localStorage.setItem(AUTH_STORAGE_KEY, token);
 }
 
-function clearAuthCookie() {
-  document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`;
-  localStorage.removeItem(AUTH_COOKIE_KEY);
+function clearStoredToken() {
+  localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
 function getTokenFromResponse(responseBody) {
@@ -224,8 +214,10 @@ async function loadVehiclesFromApi() {
 function showDashboardPage() {
   dashboardPage.classList.remove('d-none');
   vehiclesPage.classList.add('d-none');
+  rolesPage.classList.add('d-none');
   dashboardNav.classList.add('active');
   vehiclesNav.classList.remove('active');
+  rolesNav.classList.remove('active');
   pageTitle.textContent = 'O_way Admin Overview';
   pageDescription.textContent = 'Manage your yellow 3-wheeler ride network in one place.';
   refreshBtn.classList.remove('d-none');
@@ -235,8 +227,10 @@ function showDashboardPage() {
 function showVehiclesPage() {
   dashboardPage.classList.add('d-none');
   vehiclesPage.classList.remove('d-none');
+  rolesPage.classList.add('d-none');
   dashboardNav.classList.remove('active');
   vehiclesNav.classList.add('active');
+  rolesNav.classList.remove('active');
   pageTitle.textContent = 'Vehicles';
   pageDescription.textContent = 'Search and monitor live vehicle records from the admin API.';
   refreshBtn.classList.add('d-none');
@@ -244,6 +238,146 @@ function showVehiclesPage() {
 
   if (!allVehicles.length) {
     loadVehiclesFromApi();
+  }
+}
+
+
+function setRoleNotice(type, message) {
+  roleApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
+  roleApiNotice.textContent = message;
+}
+
+function mapRole(rawRole) {
+  return {
+    id: rawRole.id ?? rawRole.roleId ?? 'N/A',
+    name: rawRole.name || rawRole.roleName || 'Unknown'
+  };
+}
+
+function renderRoles(roles) {
+  if (!roles.length) {
+    roleTableBody.innerHTML = `
+      <tr>
+        <td colspan="2" class="text-center text-muted py-4">No roles found.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  roleTableBody.innerHTML = roles.map((role) => `
+    <tr>
+      <td class="fw-semibold">${role.id}</td>
+      <td>${role.name}</td>
+    </tr>
+  `).join('');
+}
+
+function setRoleFormVisible(isVisible) {
+  roleCreateForm.classList.toggle('d-none', !isVisible);
+
+  if (!isVisible) {
+    roleCreateForm.reset();
+  }
+}
+
+function setRoleCreateLoadingState(isLoading) {
+  saveRoleBtn.disabled = isLoading;
+  cancelRoleBtn.disabled = isLoading;
+  roleNameInput.disabled = isLoading;
+  saveRoleBtn.textContent = isLoading ? 'Creating...' : 'Create Role';
+}
+
+async function loadRolesFromApi() {
+  const token = getStoredToken();
+
+  if (!token) {
+    setRoleNotice('warning', 'Please log in again. Missing auth token.');
+    showLogin();
+    return;
+  }
+
+  setRoleNotice('info', `Loading roles from ${ROLES_API_URL} ...`);
+
+  try {
+    const response = await fetch(ROLES_API_URL, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`API failed with status ${response.status}`);
+    }
+
+    const responseBody = await response.json();
+    const list = Array.isArray(responseBody) ? responseBody : (responseBody.data || []);
+    allRoles = list.map(mapRole);
+    renderRoles(allRoles);
+    setRoleNotice('success', `Loaded ${allRoles.length} roles from API.`);
+  } catch (error) {
+    allRoles = [];
+    renderRoles([]);
+    setRoleNotice('danger', `Failed to load roles from API. ${error.message}`);
+  }
+}
+
+async function createRole(roleName) {
+  const token = getStoredToken();
+
+  if (!token) {
+    setRoleNotice('warning', 'Please log in again. Missing auth token.');
+    showLogin();
+    return;
+  }
+
+  if (!roleName) {
+    throw new Error('Role name is required.');
+  }
+
+  const response = await fetch(CREATE_ROLE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ roleName: roleName })
+  });
+
+  let responseBody = {};
+
+  try {
+    responseBody = await response.json();
+  } catch {
+    responseBody = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(responseBody?.message || `Failed to create role. Status ${response.status}`);
+  }
+
+  return responseBody;
+}
+
+function showRolesPage() {
+  dashboardPage.classList.add('d-none');
+  vehiclesPage.classList.add('d-none');
+  rolesPage.classList.remove('d-none');
+  dashboardNav.classList.remove('active');
+  vehiclesNav.classList.remove('active');
+  rolesNav.classList.add('active');
+  pageTitle.textContent = 'Roles';
+  pageDescription.textContent = 'Create and manage admin roles.';
+  refreshBtn.classList.add('d-none');
+  window.location.hash = 'roles';
+
+  renderRoles(allRoles);
+
+  if (!allRoles.length) {
+    loadRolesFromApi();
   }
 }
 
@@ -276,6 +410,11 @@ function showDashboard() {
 
   if (window.location.hash === '#vehicles') {
     showVehiclesPage();
+    return;
+  }
+
+  if (window.location.hash === '#roles') {
+    showRolesPage();
     return;
   }
 
@@ -324,15 +463,16 @@ async function login(name, password) {
     throw new Error('Login succeeded but no JWT token was returned by API.');
   }
 
-  setAuthCookie(token);
+  setStoredToken(token);
 }
 
 function logout() {
-  clearAuthCookie();
+  clearStoredToken();
   showLogin();
   loginForm.reset();
   loginError.classList.add('d-none');
   setLoginLoadingState(false);
+  setRoleFormVisible(false);
 }
 
 loginForm.addEventListener('submit', async (event) => {
@@ -363,6 +503,38 @@ dashboardNav.addEventListener('click', (event) => {
 vehiclesNav.addEventListener('click', (event) => {
   event.preventDefault();
   showVehiclesPage();
+});
+
+rolesNav.addEventListener('click', (event) => {
+  event.preventDefault();
+  showRolesPage();
+});
+
+addRoleBtn.addEventListener('click', () => {
+  setRoleFormVisible(true);
+  roleNameInput.focus();
+});
+
+cancelRoleBtn.addEventListener('click', () => {
+  setRoleFormVisible(false);
+});
+
+roleCreateForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const roleName = roleNameInput.value.trim();
+  setRoleCreateLoadingState(true);
+
+  try {
+    await createRole(roleName);
+    setRoleNotice('success', `Role "${roleName}" created successfully.`);
+    setRoleFormVisible(false);
+    await loadRolesFromApi();
+  } catch (error) {
+    setRoleNotice('danger', error.message);
+  } finally {
+    setRoleCreateLoadingState(false);
+  }
 });
 
 vehicleSearchInput.addEventListener('input', filterVehicleList);
