@@ -14,7 +14,7 @@ const liveTrips = [
 
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
 const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
-const AUTH_COOKIE_KEY = 'oway_admin_token';
+const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 const loginView = document.getElementById('loginView');
 const dashboardView = document.getElementById('dashboardView');
@@ -106,38 +106,16 @@ function setVehicleNotice(type, message) {
   vehicleApiNotice.textContent = message;
 }
 
-function getCookie(name) {
-  const encodedName = `${encodeURIComponent(name)}=`;
-  const cookies = document.cookie ? document.cookie.split('; ') : [];
-
-  for (const cookie of cookies) {
-    if (cookie.startsWith(encodedName)) {
-      return decodeURIComponent(cookie.slice(encodedName.length));
-    }
-  }
-
-  return null;
-}
-
 function getStoredToken() {
-  const cookieToken = getCookie(AUTH_COOKIE_KEY);
-  if (cookieToken) {
-    return cookieToken;
-  }
-
-  return localStorage.getItem(AUTH_COOKIE_KEY);
+  return localStorage.getItem(AUTH_STORAGE_KEY);
 }
 
-function setAuthCookie(token) {
-  const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=${encodeURIComponent(token)}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
-  localStorage.setItem(AUTH_COOKIE_KEY, token);
+function setStoredToken(token) {
+  localStorage.setItem(AUTH_STORAGE_KEY, token);
 }
 
-function clearAuthCookie() {
-  document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`;
-  localStorage.removeItem(AUTH_COOKIE_KEY);
+function clearStoredToken() {
+  localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
 function getTokenFromResponse(responseBody) {
@@ -324,11 +302,11 @@ async function login(name, password) {
     throw new Error('Login succeeded but no JWT token was returned by API.');
   }
 
-  setAuthCookie(token);
+  setStoredToken(token);
 }
 
 function logout() {
-  clearAuthCookie();
+  clearStoredToken();
   showLogin();
   loginForm.reset();
   loginError.classList.add('d-none');
