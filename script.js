@@ -1,3 +1,6 @@
+// ================================
+// Dashboard seed data (mock widgets)
+// ================================
 const stats = [
   { label: 'Active Drivers', value: 142, tone: 'warning' },
   { label: 'Online 3-Wheelers', value: 118, tone: 'light' },
@@ -12,6 +15,9 @@ const liveTrips = [
   { id: 'TR-5024', driver: 'Sanjeewa Fernando', vehicle: 'TW-6252', status: 'In Progress', eta: '11 min' }
 ];
 
+// ================================
+// API endpoints and auth storage
+// ================================
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
 const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
 const ROLES_API_URL = 'http://localhost:8000/api/admin/getRoles';
@@ -20,6 +26,9 @@ const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
 
+// ================================
+// DOM references
+// ================================
 const loginView = document.getElementById('loginView');
 const dashboardView = document.getElementById('dashboardView');
 const loginForm = document.getElementById('loginForm');
@@ -59,6 +68,80 @@ let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
 
+// ================================
+// Reusable utility helpers
+// ================================
+function getStoredToken() {
+  return localStorage.getItem(AUTH_STORAGE_KEY);
+}
+
+function setStoredToken(token) {
+  localStorage.setItem(AUTH_STORAGE_KEY, token);
+}
+
+function clearStoredToken() {
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+function getTokenFromResponse(responseBody) {
+  return responseBody?.token
+    || responseBody?.accessToken
+    || responseBody?.jwt
+    || responseBody?.data?.token
+    || responseBody?.data?.accessToken
+    || null;
+}
+
+// Handles multiple API response shapes so table rows still render.
+function extractCollection(responseBody, preferredKeys = []) {
+  if (Array.isArray(responseBody)) {
+    return responseBody;
+  }
+
+  for (const key of preferredKeys) {
+    const value = responseBody?.[key] || responseBody?.data?.[key] || responseBody?.result?.[key];
+
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+
+  const candidates = [
+    responseBody?.data,
+    responseBody?.result,
+    responseBody?.items,
+    responseBody?.records,
+    responseBody?.rows,
+    responseBody?.users,
+    responseBody?.vehicles,
+    responseBody?.roles
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return [];
+}
+
+function getAuthHeaders(includeJson = false) {
+  const token = getStoredToken();
+
+  if (!token) {
+    throw new Error('Missing auth token. Please log in again.');
+  }
+
+  return {
+    ...(includeJson ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token}`
+  };
+}
+
+// ================================
+// Dashboard widgets
+// ================================
 function renderStats() {
   const statsGrid = document.getElementById('statsGrid');
   statsGrid.innerHTML = stats.map((item) => `
@@ -97,6 +180,9 @@ function renderTrips() {
   `).join('');
 }
 
+// ================================
+// Vehicles
+// ================================
 function vehicleStatusBadge(status) {
   const currentStatus = (status || '').toLowerCase();
 
@@ -127,27 +213,6 @@ function mapVehicle(rawVehicle) {
 function setVehicleNotice(type, message) {
   vehicleApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
   vehicleApiNotice.textContent = message;
-}
-
-function getStoredToken() {
-  return localStorage.getItem(AUTH_STORAGE_KEY);
-}
-
-function setStoredToken(token) {
-  localStorage.setItem(AUTH_STORAGE_KEY, token);
-}
-
-function clearStoredToken() {
-  localStorage.removeItem(AUTH_STORAGE_KEY);
-}
-
-function getTokenFromResponse(responseBody) {
-  return responseBody?.token
-    || responseBody?.accessToken
-    || responseBody?.jwt
-    || responseBody?.data?.token
-    || responseBody?.data?.accessToken
-    || null;
 }
 
 function renderVehicles(vehicles) {
@@ -184,10 +249,10 @@ function filterVehicleList() {
 }
 
 async function loadVehiclesFromApi() {
-  const token = getStoredToken();
-
-  if (!token) {
-    setVehicleNotice('warning', 'Please log in again. Missing auth token.');
+  try {
+    getAuthHeaders();
+  } catch (error) {
+    setVehicleNotice('warning', error.message);
     showLogin();
     return;
   }
@@ -196,9 +261,7 @@ async function loadVehiclesFromApi() {
 
   try {
     const response = await fetch(VEHICLE_API_URL, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      headers: getAuthHeaders()
     });
 
     if (response.status === 401 || response.status === 403) {
@@ -210,7 +273,7 @@ async function loadVehiclesFromApi() {
     }
 
     const responseBody = await response.json();
-    const list = Array.isArray(responseBody) ? responseBody : (responseBody.data || []);
+    const list = extractCollection(responseBody, ['vehicles']);
     allVehicles = list.map(mapVehicle);
 
     filterVehicleList();
@@ -222,57 +285,41 @@ async function loadVehiclesFromApi() {
   }
 }
 
-function showDashboardPage() {
-  dashboardPage.classList.remove('d-none');
-  vehiclesPage.classList.add('d-none');
-  usersPage.classList.add('d-none');
-  rolesPage.classList.add('d-none');
-  dashboardNav.classList.add('active');
-  vehiclesNav.classList.remove('active');
-  usersNav.classList.remove('active');
-  rolesNav.classList.remove('active');
-  pageTitle.textContent = 'O_way Admin Overview';
-  pageDescription.textContent = 'Manage your yellow 3-wheeler ride network in one place.';
-  refreshBtn.classList.remove('d-none');
-  window.location.hash = 'dashboard';
-}
-
-function showVehiclesPage() {
-  dashboardPage.classList.add('d-none');
-  vehiclesPage.classList.remove('d-none');
-  usersPage.classList.add('d-none');
-  rolesPage.classList.add('d-none');
-  dashboardNav.classList.remove('active');
-  vehiclesNav.classList.add('active');
-  usersNav.classList.remove('active');
-  rolesNav.classList.remove('active');
-  pageTitle.textContent = 'Vehicles';
-  pageDescription.textContent = 'Search and monitor live vehicle records from the admin API.';
-  refreshBtn.classList.add('d-none');
-  window.location.hash = 'vehicles';
-
-  if (!allVehicles.length) {
-    loadVehiclesFromApi();
-  }
-}
-
-
-
+// ================================
+// Users & profiles
+// ================================
 function setUserNotice(type, message) {
   userApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
   userApiNotice.textContent = message;
 }
 
 function normalizeUserRoles(rawUser) {
-  const rawRoles = rawUser.roles ?? rawUser.role ?? rawUser.userRoles ?? rawUser.roleNames ?? [];
+  const possibleRoleSources = [
+    rawUser.roles,
+    rawUser.role,
+    rawUser.userRoles,
+    rawUser.roleNames,
+    rawUser.roleName,
+    rawUser.assignedRoles,
+    rawUser.authorities
+  ];
+
+  const rawRoles = possibleRoleSources.find((value) => value !== undefined && value !== null);
 
   if (Array.isArray(rawRoles)) {
     return rawRoles.map((role) => {
       if (typeof role === 'string') {
-        return role;
+        return role.trim();
       }
 
-      return role.name || role.roleName || role.title || String(role.id || '').trim();
+      return (
+        role?.name
+        || role?.roleName
+        || role?.title
+        || role?.label
+        || role?.role
+        || String(role?.id || '').trim()
+      );
     }).filter(Boolean);
   }
 
@@ -285,9 +332,11 @@ function normalizeUserRoles(rawUser) {
 
 function mapUser(rawUser) {
   return {
-    id: rawUser.id ?? rawUser.userId ?? rawUser._id ?? null,
-    name: rawUser.name || rawUser.fullName || rawUser.username || 'Unknown',
-    roles: normalizeUserRoles(rawUser)
+    id: rawUser.id ?? rawUser.userId ?? rawUser._id ?? rawUser.uuid ?? null,
+    name: rawUser.name || rawUser.fullName || rawUser.username || rawUser.email || 'Unknown',
+    email: rawUser.email || 'N/A',
+    roles: normalizeUserRoles(rawUser),
+    raw: rawUser
   };
 }
 
@@ -305,9 +354,16 @@ function renderUsers(users) {
     <tr>
       <td class="fw-semibold">${index + 1}</td>
       <td>${user.name}</td>
-      <td>${user.roles.length ? user.roles.join(', ') : 'No roles'}</td>
+      <td>${user.roles.length ? user.roles.join(', ') : '<span class="text-muted">No roles assigned</span>'}</td>
       <td>
-        <button class="btn btn-outline-dark btn-sm view-user-profile-btn" data-user-id="${user.id ?? ''}" data-user-name="${user.name}">View User Profile</button>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-gradient-primary btn-sm view-user-profile-btn" data-user-id="${user.id ?? ''}" data-user-name="${user.name}" data-user-email="${user.email}">
+            <i class="bi bi-person-vcard me-1"></i>View Profile
+          </button>
+          <button class="btn btn-soft-secondary btn-sm copy-user-id-btn" data-user-id="${user.id ?? ''}">
+            <i class="bi bi-clipboard me-1"></i>Copy ID
+          </button>
+        </div>
       </td>
     </tr>
   `).join('');
@@ -324,25 +380,29 @@ function filterUsers() {
   const filteredUsers = allUsers.filter((user) => {
     const roleText = user.roles.join(' ').toLowerCase();
 
-    return user.name.toLowerCase().includes(query) || roleText.includes(query);
+    return user.name.toLowerCase().includes(query)
+      || roleText.includes(query)
+      || String(user.email || '').toLowerCase().includes(query)
+      || String(user.id || '').toLowerCase().includes(query);
   });
 
   renderUsers(filteredUsers);
 }
 
 function renderUserProfile(profile, userName) {
-  if (!profile) {
-    userProfileBody.innerHTML = `<p class="mb-0">No profile found for ${userName}.</p>`;
-    userProfileCard.classList.remove('d-none');
-    return;
-  }
+  const safeProfile = profile || {};
+
+  const roleValue = Array.isArray(safeProfile.roles)
+    ? safeProfile.roles.map((role) => role?.name || role?.roleName || role).filter(Boolean).join(', ')
+    : (safeProfile.roles || safeProfile.role || safeProfile.roleName || 'N/A');
 
   const fields = [
-    ['Name', profile.name || profile.fullName || userName || 'N/A'],
-    ['Email', profile.email || 'N/A'],
-    ['Phone', profile.phone || profile.contact || 'N/A'],
-    ['Address', profile.address || 'N/A'],
-    ['Roles', Array.isArray(profile.roles) ? profile.roles.map((role) => role.name || role.roleName || role).join(', ') : (profile.roles || profile.role || 'N/A')]
+    ['Name', safeProfile.name || safeProfile.fullName || userName || 'N/A'],
+    ['Email', safeProfile.email || 'N/A'],
+    ['Phone', safeProfile.phone || safeProfile.contact || safeProfile.mobile || 'N/A'],
+    ['Address', safeProfile.address || safeProfile.location || 'N/A'],
+    ['Roles', roleValue],
+    ['Status', safeProfile.status || safeProfile.accountStatus || 'N/A']
   ];
 
   userProfileBody.innerHTML = fields.map(([label, value]) => `
@@ -355,10 +415,10 @@ function renderUserProfile(profile, userName) {
 }
 
 async function loadUsersFromApi() {
-  const token = getStoredToken();
-
-  if (!token) {
-    setUserNotice('warning', 'Please log in again. Missing auth token.');
+  try {
+    getAuthHeaders();
+  } catch (error) {
+    setUserNotice('warning', error.message);
     showLogin();
     return;
   }
@@ -367,9 +427,7 @@ async function loadUsersFromApi() {
 
   try {
     const response = await fetch(USERS_API_URL, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      headers: getAuthHeaders()
     });
 
     if (response.status === 401 || response.status === 403) {
@@ -381,10 +439,14 @@ async function loadUsersFromApi() {
     }
 
     const responseBody = await response.json();
-    const list = Array.isArray(responseBody) ? responseBody : (responseBody.data || []);
+    const list = extractCollection(responseBody, ['users']);
+
     allUsers = list.map(mapUser);
     filterUsers();
-    setUserNotice('success', `Loaded ${allUsers.length} users from API.`);
+
+    const noRoleCount = allUsers.filter((user) => !user.roles.length).length;
+    const roleText = noRoleCount ? ` (${noRoleCount} users without mapped roles)` : '';
+    setUserNotice('success', `Loaded ${allUsers.length} users from API${roleText}.`);
   } catch (error) {
     allUsers = [];
     renderUsers([]);
@@ -397,67 +459,74 @@ async function loadProfilesFromApi() {
     return allProfiles;
   }
 
-  const token = getStoredToken();
+  const response = await fetch(PROFILES_API_URL, {
+    headers: getAuthHeaders()
+  });
 
-  if (!token) {
-    setUserNotice('warning', 'Please log in again. Missing auth token.');
-    showLogin();
+  if (response.status === 403) {
+    // Some backends restrict /getProfiles. We gracefully fall back to user table data.
     return [];
   }
-
-  const response = await fetch(PROFILES_API_URL, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
 
   if (!response.ok) {
     throw new Error(`Failed to load profiles. Status ${response.status}`);
   }
 
   const responseBody = await response.json();
-  const list = Array.isArray(responseBody) ? responseBody : (responseBody.data || []);
+  const list = extractCollection(responseBody, ['profiles', 'users']);
   allProfiles = list;
   return allProfiles;
 }
 
-async function viewUserProfile(userId, userName) {
+async function viewUserProfile(userId, userName, userEmail = '') {
   try {
     const profiles = await loadProfilesFromApi();
 
     const profile = profiles.find((item) => (
-      String(item.id ?? item.userId ?? item._id ?? '') === String(userId)
+      String(item.id ?? item.userId ?? item._id ?? item.uuid ?? '') === String(userId)
+    )) || profiles.find((item) => (
+      (item.email || '').toLowerCase() === String(userEmail || '').toLowerCase()
     )) || profiles.find((item) => (
       (item.name || item.fullName || '').toLowerCase() === String(userName || '').toLowerCase()
     ));
 
-    renderUserProfile(profile, userName);
+    if (profile) {
+      renderUserProfile(profile, userName);
+      return;
+    }
+
+    // Fallback when profile endpoint is blocked: reuse user row data.
+    const fallbackUser = allUsers.find((user) => String(user.id) === String(userId))
+      || allUsers.find((user) => user.name.toLowerCase() === String(userName || '').toLowerCase());
+
+    renderUserProfile({
+      id: fallbackUser?.id || userId,
+      name: fallbackUser?.name || userName,
+      email: fallbackUser?.email || userEmail,
+      roles: fallbackUser?.roles || [],
+      status: 'Profile details limited by API permission'
+    }, userName);
+
+    setUserNotice('warning', 'Full profile endpoint is restricted (403). Showing available user details.');
   } catch (error) {
     setUserNotice('danger', error.message);
   }
 }
 
-function showUsersPage() {
-  dashboardPage.classList.add('d-none');
-  vehiclesPage.classList.add('d-none');
-  rolesPage.classList.add('d-none');
-  usersPage.classList.remove('d-none');
-  dashboardNav.classList.remove('active');
-  vehiclesNav.classList.remove('active');
-  usersNav.classList.add('active');
-  rolesNav.classList.remove('active');
-  pageTitle.textContent = 'Users';
-  pageDescription.textContent = 'Search users by name or role and open profiles.';
-  refreshBtn.classList.add('d-none');
-  window.location.hash = 'users';
-
-  if (!allUsers.length) {
-    loadUsersFromApi();
-  } else {
-    filterUsers();
+function copyUserId(userId) {
+  if (!userId) {
+    setUserNotice('warning', 'This user does not have a visible ID in API response.');
+    return;
   }
+
+  navigator.clipboard.writeText(String(userId))
+    .then(() => setUserNotice('success', `User ID ${userId} copied to clipboard.`))
+    .catch(() => setUserNotice('warning', `Copy failed. User ID: ${userId}`));
 }
 
+// ================================
+// Roles
+// ================================
 function setRoleNotice(type, message) {
   roleApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
   roleApiNotice.textContent = message;
@@ -504,10 +573,10 @@ function setRoleCreateLoadingState(isLoading) {
 }
 
 async function loadRolesFromApi() {
-  const token = getStoredToken();
-
-  if (!token) {
-    setRoleNotice('warning', 'Please log in again. Missing auth token.');
+  try {
+    getAuthHeaders();
+  } catch (error) {
+    setRoleNotice('warning', error.message);
     showLogin();
     return;
   }
@@ -516,9 +585,7 @@ async function loadRolesFromApi() {
 
   try {
     const response = await fetch(ROLES_API_URL, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      headers: getAuthHeaders()
     });
 
     if (response.status === 401 || response.status === 403) {
@@ -530,7 +597,7 @@ async function loadRolesFromApi() {
     }
 
     const responseBody = await response.json();
-    const list = Array.isArray(responseBody) ? responseBody : (responseBody.data || []);
+    const list = extractCollection(responseBody, ['roles']);
     allRoles = list.map(mapRole);
     renderRoles(allRoles);
     setRoleNotice('success', `Loaded ${allRoles.length} roles from API.`);
@@ -542,25 +609,14 @@ async function loadRolesFromApi() {
 }
 
 async function createRole(roleName) {
-  const token = getStoredToken();
-
-  if (!token) {
-    setRoleNotice('warning', 'Please log in again. Missing auth token.');
-    showLogin();
-    return;
-  }
-
   if (!roleName) {
     throw new Error('Role name is required.');
   }
 
   const response = await fetch(CREATE_ROLE_API_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({ roleName: roleName })
+    headers: getAuthHeaders(true),
+    body: JSON.stringify({ roleName })
   });
 
   let responseBody = {};
@@ -576,6 +632,64 @@ async function createRole(roleName) {
   }
 
   return responseBody;
+}
+
+// ================================
+// Page-level navigation & actions
+// ================================
+function showDashboardPage() {
+  dashboardPage.classList.remove('d-none');
+  vehiclesPage.classList.add('d-none');
+  usersPage.classList.add('d-none');
+  rolesPage.classList.add('d-none');
+  dashboardNav.classList.add('active');
+  vehiclesNav.classList.remove('active');
+  usersNav.classList.remove('active');
+  rolesNav.classList.remove('active');
+  pageTitle.textContent = 'O_way Admin Overview';
+  pageDescription.textContent = 'Manage your yellow 3-wheeler ride network in one place.';
+  refreshBtn.classList.remove('d-none');
+  window.location.hash = 'dashboard';
+}
+
+function showVehiclesPage() {
+  dashboardPage.classList.add('d-none');
+  vehiclesPage.classList.remove('d-none');
+  usersPage.classList.add('d-none');
+  rolesPage.classList.add('d-none');
+  dashboardNav.classList.remove('active');
+  vehiclesNav.classList.add('active');
+  usersNav.classList.remove('active');
+  rolesNav.classList.remove('active');
+  pageTitle.textContent = 'Vehicles';
+  pageDescription.textContent = 'Search and monitor live vehicle records from the admin API.';
+  refreshBtn.classList.add('d-none');
+  window.location.hash = 'vehicles';
+
+  if (!allVehicles.length) {
+    loadVehiclesFromApi();
+  }
+}
+
+function showUsersPage() {
+  dashboardPage.classList.add('d-none');
+  vehiclesPage.classList.add('d-none');
+  rolesPage.classList.add('d-none');
+  usersPage.classList.remove('d-none');
+  dashboardNav.classList.remove('active');
+  vehiclesNav.classList.remove('active');
+  usersNav.classList.add('active');
+  rolesNav.classList.remove('active');
+  pageTitle.textContent = 'Users';
+  pageDescription.textContent = 'Search users by name or role and open profiles.';
+  refreshBtn.classList.add('d-none');
+  window.location.hash = 'users';
+
+  if (!allUsers.length) {
+    loadUsersFromApi();
+  } else {
+    filterUsers();
+  }
 }
 
 function showRolesPage() {
@@ -618,6 +732,9 @@ function refreshDashboard() {
   renderTrips();
 }
 
+// ================================
+// Auth flow
+// ================================
 function showDashboard() {
   loginView.classList.add('d-none');
   dashboardView.classList.remove('d-none');
@@ -700,6 +817,9 @@ function logout() {
   userProfileBody.innerHTML = '';
 }
 
+// ================================
+// Event bindings
+// ================================
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
@@ -771,21 +891,30 @@ vehicleSearchInput.addEventListener('input', filterVehicleList);
 userSearchInput.addEventListener('input', filterUsers);
 
 userTableBody.addEventListener('click', (event) => {
-  const button = event.target.closest('.view-user-profile-btn');
+  const profileButton = event.target.closest('.view-user-profile-btn');
 
-  if (!button) {
+  if (profileButton) {
+    const userId = profileButton.dataset.userId || '';
+    const userName = profileButton.dataset.userName || 'Selected user';
+    const userEmail = profileButton.dataset.userEmail || '';
+    viewUserProfile(userId, userName, userEmail);
     return;
   }
 
-  const userId = button.dataset.userId || '';
-  const userName = button.dataset.userName || 'Selected user';
-  viewUserProfile(userId, userName);
+  const copyButton = event.target.closest('.copy-user-id-btn');
+
+  if (copyButton) {
+    copyUserId(copyButton.dataset.userId || '');
+  }
 });
 
 refreshBtn.addEventListener('click', refreshDashboard);
 logoutBtn.addEventListener('click', logout);
 loadVehiclesBtn.addEventListener('click', loadVehiclesFromApi);
 
+// ================================
+// App bootstrap
+// ================================
 if (getStoredToken()) {
   showDashboard();
 } else {
