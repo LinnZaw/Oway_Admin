@@ -14,7 +14,7 @@ const liveTrips = [
 
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
 const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
-const AUTH_COOKIE_KEY = 'oway_admin_token';
+var AUTH_COOKIE_KEY = 'oway_admin_token';
 
 const loginView = document.getElementById('loginView');
 const dashboardView = document.getElementById('dashboardView');
@@ -174,6 +174,8 @@ function filterVehicleList() {
 async function loadVehiclesFromApi() {
   const token = getCookie(AUTH_COOKIE_KEY);
 
+console.log("Using JWT Token for API:", token);
+
   if (!token) {
     setVehicleNotice('warning', 'Please log in again. Missing auth token.');
     showLogin();
@@ -273,8 +275,8 @@ function setLoginLoadingState(isLoading) {
   loginSubmitBtn.textContent = isLoading ? 'Logging in...' : 'Login';
 }
 
-async function login(username, password) {
-  if (!username || !password) {
+async function login(name, password) {
+  if (!name || !password) {
     throw new Error('Username and password are required.');
   }
 
@@ -283,7 +285,7 @@ async function login(username, password) {
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ name, password })
   });
 
   let responseBody = {};
@@ -304,6 +306,8 @@ async function login(username, password) {
   if (!token) {
     throw new Error('Login succeeded but no JWT token was returned by API.');
   }
+  console.log("JWT Token:", token);
+
 
   setAuthCookie(token);
 }
@@ -319,7 +323,7 @@ function logout() {
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
-  const username = document.getElementById('username').value.trim();
+  const username = document.getElementById('name').value.trim();
   const password = document.getElementById('password').value.trim();
 
   setLoginLoadingState(true);
