@@ -14,7 +14,7 @@ const liveTrips = [
 
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
 const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
-var AUTH_COOKIE_KEY = 'oway_admin_token';
+const AUTH_COOKIE_KEY = 'oway_admin_token';
 
 const loginView = document.getElementById('loginView');
 const dashboardView = document.getElementById('dashboardView');
@@ -119,14 +119,25 @@ function getCookie(name) {
   return null;
 }
 
+function getStoredToken() {
+  const cookieToken = getCookie(AUTH_COOKIE_KEY);
+  if (cookieToken) {
+    return cookieToken;
+  }
+
+  return localStorage.getItem(AUTH_COOKIE_KEY);
+}
+
 function setAuthCookie(token) {
   const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
   document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=${encodeURIComponent(token)}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
+  localStorage.setItem(AUTH_COOKIE_KEY, token);
 }
 
 function clearAuthCookie() {
   document.cookie = `${encodeURIComponent(AUTH_COOKIE_KEY)}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`;
+  localStorage.removeItem(AUTH_COOKIE_KEY);
 }
 
 function getTokenFromResponse(responseBody) {
@@ -172,9 +183,7 @@ function filterVehicleList() {
 }
 
 async function loadVehiclesFromApi() {
-  const token = getCookie(AUTH_COOKIE_KEY);
-
-console.log("Using JWT Token for API:", token);
+  const token = getStoredToken();
 
   if (!token) {
     setVehicleNotice('warning', 'Please log in again. Missing auth token.');
@@ -220,6 +229,7 @@ function showDashboardPage() {
   pageTitle.textContent = 'O_way Admin Overview';
   pageDescription.textContent = 'Manage your yellow 3-wheeler ride network in one place.';
   refreshBtn.classList.remove('d-none');
+  window.location.hash = 'dashboard';
 }
 
 function showVehiclesPage() {
@@ -230,6 +240,7 @@ function showVehiclesPage() {
   pageTitle.textContent = 'Vehicles';
   pageDescription.textContent = 'Search and monitor live vehicle records from the admin API.';
   refreshBtn.classList.add('d-none');
+  window.location.hash = 'vehicles';
 
   if (!allVehicles.length) {
     loadVehiclesFromApi();
@@ -262,6 +273,12 @@ function showDashboard() {
   renderTrips();
   renderVehicles([]);
   setVehicleNotice('info', 'Open Vehicles page to load data from API.');
+
+  if (window.location.hash === '#vehicles') {
+    showVehiclesPage();
+    return;
+  }
+
   showDashboardPage();
 }
 
@@ -306,8 +323,6 @@ async function login(name, password) {
   if (!token) {
     throw new Error('Login succeeded but no JWT token was returned by API.');
   }
-  console.log("JWT Token:", token);
-
 
   setAuthCookie(token);
 }
@@ -355,7 +370,7 @@ refreshBtn.addEventListener('click', refreshDashboard);
 logoutBtn.addEventListener('click', logout);
 loadVehiclesBtn.addEventListener('click', loadVehiclesFromApi);
 
-if (getCookie(AUTH_COOKIE_KEY)) {
+if (getStoredToken()) {
   showDashboard();
 } else {
   showLogin();
