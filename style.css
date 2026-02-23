@@ -140,3 +140,26 @@ body {
     font-size: 1.1rem;
   }
 }
+
+.btn-gradient-primary {
+  border: none;
+  color: #fff;
+  background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+  box-shadow: 0 8px 16px rgba(14, 165, 233, 0.25);
+}
+
+.btn-gradient-primary:hover {
+  color: #fff;
+  background: linear-gradient(135deg, #4338ca, #0284c7);
+}
+
+.btn-soft-secondary {
+  border: 1px solid #dbe2f4;
+  background: #f8faff;
+  color: #334155;
+}
+
+.btn-soft-secondary:hover {
+  background: #eef4ff;
+  color: #1e293b;
+}
