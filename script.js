@@ -51,8 +51,9 @@ const usersPage = document.getElementById('usersPage');
 const userTableBody = document.getElementById('userTableBody');
 const userApiNotice = document.getElementById('userApiNotice');
 const userSearchInput = document.getElementById('userSearchInput');
-const userProfileCard = document.getElementById('userProfileCard');
+const userProfileModalEl = document.getElementById('userProfileModal');
 const userProfileBody = document.getElementById('userProfileBody');
+const userProfileModal = userProfileModalEl && window.bootstrap ? new bootstrap.Modal(userProfileModalEl) : null;
 const rolesPage = document.getElementById('rolesPage');
 const roleTableBody = document.getElementById('roleTableBody');
 const roleApiNotice = document.getElementById('roleApiNotice');
@@ -67,6 +68,7 @@ let allVehicles = [];
 let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
+let roleLookupById = new Map();
 
 // ================================
 // Reusable utility helpers
@@ -330,12 +332,67 @@ function normalizeUserRoles(rawUser) {
   return [];
 }
 
+function extractRoleIds(rawUser) {
+  const roleIdSources = [
+    rawUser.roleIds,
+    rawUser.rolesIds,
+    rawUser.roleId,
+    rawUser.userRoleIds,
+    rawUser.assignedRoleIds,
+    rawUser.role
+  ];
+
+  const source = roleIdSources.find((value) => value !== undefined && value !== null);
+
+  if (Array.isArray(source)) {
+    return source
+      .map((item) => {
+        if (typeof item === 'object' && item !== null) {
+          return item.id ?? item.roleId ?? item.value ?? null;
+        }
+
+        return item;
+      })
+      .filter((item) => item !== undefined && item !== null && String(item).trim() !== '')
+      .map((item) => String(item));
+  }
+
+  if (typeof source === 'string' || typeof source === 'number') {
+    return String(source)
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function resolveAssignedRoles(rawUser) {
+  const directRoles = normalizeUserRoles(rawUser);
+
+  if (directRoles.length) {
+    return directRoles;
+  }
+
+  const roleIds = extractRoleIds(rawUser);
+
+  if (!roleIds.length || !roleLookupById.size) {
+    return [];
+  }
+
+  const mappedNames = roleIds
+    .map((id) => roleLookupById.get(String(id)) || roleLookupById.get(Number(id)))
+    .filter(Boolean);
+
+  return [...new Set(mappedNames)];
+}
+
 function mapUser(rawUser) {
   return {
     id: rawUser.id ?? rawUser.userId ?? rawUser._id ?? rawUser.uuid ?? null,
     name: rawUser.name || rawUser.fullName || rawUser.username || rawUser.email || 'Unknown',
     email: rawUser.email || 'N/A',
-    roles: normalizeUserRoles(rawUser),
+    roles: resolveAssignedRoles(rawUser),
     raw: rawUser
   };
 }
@@ -411,7 +468,9 @@ function renderUserProfile(profile, userName) {
       <span>${value}</span>
     </div>
   `).join('');
-  userProfileCard.classList.remove('d-none');
+  if (userProfileModal) {
+    userProfileModal.show();
+  }
 }
 
 async function loadUsersFromApi() {
@@ -426,6 +485,10 @@ async function loadUsersFromApi() {
   setUserNotice('info', `Loading users from ${USERS_API_URL} ...`);
 
   try {
+    if (!allRoles.length) {
+      await loadRolesFromApi();
+    }
+
     const response = await fetch(USERS_API_URL, {
       headers: getAuthHeaders()
     });
@@ -599,10 +662,12 @@ async function loadRolesFromApi() {
     const responseBody = await response.json();
     const list = extractCollection(responseBody, ['roles']);
     allRoles = list.map(mapRole);
+    roleLookupById = new Map(allRoles.map((role) => [String(role.id), role.name]));
     renderRoles(allRoles);
     setRoleNotice('success', `Loaded ${allRoles.length} roles from API.`);
   } catch (error) {
     allRoles = [];
+    roleLookupById = new Map();
     renderRoles([]);
     setRoleNotice('danger', `Failed to load roles from API. ${error.message}`);
   }
@@ -688,6 +753,16 @@ function showUsersPage() {
   if (!allUsers.length) {
     loadUsersFromApi();
   } else {
+    // Re-map existing users once roles are loaded to ensure role names are visible.
+    if (!allRoles.length) {
+      loadRolesFromApi().finally(() => {
+        allUsers = allUsers.map((user) => ({ ...user, roles: resolveAssignedRoles(user.raw || {}) }));
+        filterUsers();
+      });
+      return;
+    }
+
+    allUsers = allUsers.map((user) => ({ ...user, roles: resolveAssignedRoles(user.raw || {}) }));
     filterUsers();
   }
 }
@@ -813,7 +888,9 @@ function logout() {
   loginError.classList.add('d-none');
   setLoginLoadingState(false);
   setRoleFormVisible(false);
-  userProfileCard.classList.add('d-none');
+  if (userProfileModal) {
+    userProfileModal.hide();
+  }
   userProfileBody.innerHTML = '';
 }
 
