@@ -325,7 +325,7 @@ async function loadRolesFromApi() {
   }
 }
 
-async function createRole(roleName) {
+async function createRole(name) {
   const token = getStoredToken();
 
   if (!token) {
@@ -334,7 +334,7 @@ async function createRole(roleName) {
     return;
   }
 
-  if (!roleName) {
+  if (!name) {
     throw new Error('Role name is required.');
   }
 
@@ -344,7 +344,7 @@ async function createRole(roleName) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ roleName: roleName })
+    body: JSON.stringify({ name: name })
   });
 
   let responseBody = {};
