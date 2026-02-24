@@ -20,6 +20,7 @@ const liveTrips = [
 // ================================
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
 const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
+const DELETE_VEHICLE_API_URL = 'http://localhost:8000/api/admin/deleteVehicle';
 const ROLES_API_URL = 'http://localhost:8000/api/admin/getRoles';
 const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
@@ -203,12 +204,33 @@ function vehicleStatusBadge(status) {
   return 'bg-info text-dark';
 }
 
+function formatDriverAddress(rawAddress) {
+  if (!rawAddress) {
+    return 'N/A';
+  }
+
+  if (typeof rawAddress === 'string') {
+    return rawAddress;
+  }
+
+  const orderedParts = [
+    rawAddress.street,
+    rawAddress.road,
+    rawAddress.township,
+    rawAddress.city
+  ].filter(Boolean);
+
+  return orderedParts.length ? orderedParts.join(', ') : 'N/A';
+}
+
 function mapVehicle(rawVehicle) {
   return {
+    id: rawVehicle.id || rawVehicle.vehicleId || rawVehicle.userId || null,
     plateNumber: rawVehicle.plateNumber || rawVehicle.vehiclePlateNumber || rawVehicle.plateNo || 'N/A',
-    contact: rawVehicle.contact || rawVehicle.phone || rawVehicle.mobile || 'N/A',
-    status: rawVehicle.status || rawVehicle.vehicleStatus || 'Unknown',
-    address: rawVehicle.address || rawVehicle.currentAddress || rawVehicle.location || 'N/A'
+    driverId: rawVehicle.driverId || rawVehicle.userId || rawVehicle.driver?.id || rawVehicle.user?.id || 'N/A',
+    contact: rawVehicle.contact || rawVehicle.phone || rawVehicle.mobile || rawVehicle.driver?.contact || rawVehicle.user?.phone || 'N/A',
+    status: rawVehicle.status || rawVehicle.vehicleStatus || rawVehicle.driverStatus || 'Unknown',
+    address: formatDriverAddress(rawVehicle.address || rawVehicle.currentAddress || rawVehicle.locationAddress || rawVehicle.location)
   };
 }
 
@@ -221,18 +243,23 @@ function renderVehicles(vehicles) {
   if (!vehicles.length) {
     vehicleTableBody.innerHTML = `
       <tr>
-        <td colspan="4" class="text-center text-muted py-4">No vehicles found.</td>
+        <td colspan="7" class="text-center text-muted py-4">No vehicles found.</td>
       </tr>
     `;
     return;
   }
 
-  vehicleTableBody.innerHTML = vehicles.map((vehicle) => `
+  vehicleTableBody.innerHTML = vehicles.map((vehicle, index) => `
     <tr>
+      <td>${index + 1}</td>
       <td class="fw-semibold">${vehicle.plateNumber}</td>
+      <td>${vehicle.driverId}</td>
       <td>${vehicle.contact}</td>
-      <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
       <td>${vehicle.address}</td>
+      <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
+      <td>
+        <button class="btn btn-sm btn-outline-danger js-delete-vehicle" data-id="${vehicle.id ?? ''}" data-plate="${vehicle.plateNumber}">Delete</button>
+      </td>
     </tr>
   `).join('');
 }
@@ -242,6 +269,7 @@ function filterVehicleList() {
 
   const filteredVehicles = allVehicles.filter((vehicle) => (
     vehicle.plateNumber.toLowerCase().includes(query)
+      || String(vehicle.driverId).toLowerCase().includes(query)
       || vehicle.contact.toLowerCase().includes(query)
       || vehicle.status.toLowerCase().includes(query)
       || vehicle.address.toLowerCase().includes(query)
@@ -276,7 +304,7 @@ async function loadVehiclesFromApi() {
 
     const responseBody = await response.json();
     const list = extractCollection(responseBody, ['vehicles']);
-    allVehicles = list.map(mapVehicle);
+    allVehicles = list.map((vehicle) => mapVehicle(vehicle));
 
     filterVehicleList();
     setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles from API.`);
@@ -1033,6 +1061,17 @@ userTableBody.addEventListener('click', (event) => {
 refreshBtn.addEventListener('click', refreshDashboard);
 logoutBtn.addEventListener('click', logout);
 loadVehiclesBtn.addEventListener('click', loadVehiclesFromApi);
+
+vehicleTableBody.addEventListener('click', (event) => {
+  const deleteButton = event.target.closest('.js-delete-vehicle');
+
+  if (!deleteButton) {
+    return;
+  }
+
+  handleDeleteVehicle(deleteButton.dataset.id, deleteButton.dataset.plate);
+});
+
 
 // ================================
 // App bootstrap
