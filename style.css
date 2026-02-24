@@ -260,6 +260,13 @@ body {
   overflow: auto;
 }
 
+.vehicle-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.vehicle-table th,
+.vehicle-table td,
 .data-form-panel table th,
 .data-form-panel table td {
   white-space: normal;
