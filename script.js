@@ -24,7 +24,6 @@ const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
-const DELETE_VEHICLE_API_URL = 'http://localhost:8000/api/admin/deleteVehicle';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 // ================================
@@ -223,25 +222,66 @@ function renderVehicles(vehicles) {
     return;
   }
 
-  vehicleTableBody.innerHTML = vehicles.map((vehicle, index) => `
-    <tr>
-      <td class="fw-semibold">${index + 1}</td>
-      <td class="fw-semibold">${vehicle.plateNumber}</td>
-      <td>${vehicle.nrc}</td>
-      <td>${vehicle.contact}</td>
-      <td>${vehicle.ownerName}</td>
-      <td>
-        <span class="badge rounded-pill fw-semibold ${getVehicleStatusBadgeClass(vehicle.vehicleStatus)}">
-          ${vehicle.vehicleStatus}
-        </span>
-      </td>
-      <td>
-        <button class="btn btn-outline-danger btn-sm delete-vehicle-btn" data-vehicle-id="${vehicle.id}">
-          <i class="bi bi-trash3 me-1"></i>Delete
-        </button>
-      </td>
-    </tr>
-  `).join('');
+  vehicleTableBody.innerHTML = vehicles.map((vehicle, index) => {
+    const normalizedStatus = String(vehicle.vehicleStatus || '').toUpperCase();
+    const actionButtons = normalizedStatus === 'PENDING'
+      ? `
+        <div class="d-flex gap-2">
+          <button class="btn btn-success btn-sm accept-vehicle-btn" data-vehicle-id="${vehicle.id}">
+            <i class="bi bi-check2-circle me-1"></i>Accept
+          </button>
+          <button class="btn btn-danger btn-sm deny-vehicle-btn" data-vehicle-id="${vehicle.id}">
+            <i class="bi bi-x-circle me-1"></i>Deny
+          </button>
+        </div>
+      `
+      : '';
+
+    return `
+      <tr>
+        <td class="fw-semibold">${index + 1}</td>
+        <td class="fw-semibold">${vehicle.plateNumber}</td>
+        <td>${vehicle.nrc}</td>
+        <td>${vehicle.contact}</td>
+        <td>${vehicle.ownerName}</td>
+        <td>
+          <span class="badge rounded-pill fw-semibold ${getVehicleStatusBadgeClass(vehicle.vehicleStatus)}">
+            ${vehicle.vehicleStatus}
+          </span>
+        </td>
+        <td>${actionButtons}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function patchVehicleStatus(vehicleId, action) {
+  const normalizedAction = String(action || '').toLowerCase();
+
+  if (!['accept', 'deny'].includes(normalizedAction)) {
+    throw new Error('Invalid vehicle action.');
+  }
+
+  const response = await fetch(`http://localhost:8000/api/admin/vehicles/${vehicleId}/${normalizedAction}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders()
+  });
+
+  let responseBody = {};
+
+  try {
+    responseBody = await response.json();
+  } catch {
+    responseBody = {};
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  if (!response.ok) {
+    throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${response.status}`);
+  }
 }
 
 async function loadVehiclesFromApi() {
@@ -278,25 +318,6 @@ async function loadVehiclesFromApi() {
     allVehicles = [];
     renderVehicles([]);
     setVehicleNotice('danger', `Failed to load vehicles from API. ${error.message}`);
-  }
-}
-
-async function deleteVehicleById(vehicleId) {
-  const response = await fetch(`${DELETE_VEHICLE_API_URL}/${vehicleId}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders()
-  });
-
-  let responseBody = {};
-
-  try {
-    responseBody = await response.json();
-  } catch {
-    responseBody = {};
-  }
-
-  if (!response.ok) {
-    throw new Error(responseBody?.message || `Failed to delete vehicle. Status ${response.status}`);
   }
 }
 
@@ -1036,37 +1057,34 @@ userTableBody.addEventListener('click', (event) => {
 });
 
 vehicleTableBody.addEventListener('click', async (event) => {
-  const deleteButton = event.target.closest('.delete-vehicle-btn');
+  const acceptButton = event.target.closest('.accept-vehicle-btn');
+  const denyButton = event.target.closest('.deny-vehicle-btn');
 
-  if (!deleteButton) {
+  if (!acceptButton && !denyButton) {
     return;
   }
 
-  const vehicleId = deleteButton.dataset.vehicleId;
+  const clickedButton = acceptButton || denyButton;
+  const vehicleId = clickedButton.dataset.vehicleId;
 
   if (!vehicleId) {
-    setVehicleNotice('danger', 'Vehicle ID is missing. Unable to delete.');
+    setVehicleNotice('danger', 'Vehicle ID is missing.');
     return;
   }
 
-  const isConfirmed = window.confirm('Are you sure you want to delete this vehicle?');
+  const action = acceptButton ? 'accept' : 'deny';
+  const actionLabel = action === 'accept' ? 'accepted' : 'denied';
 
-  if (!isConfirmed) {
-    return;
-  }
-
-  deleteButton.disabled = true;
-  deleteButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Deleting';
+  clickedButton.disabled = true;
 
   try {
-    await deleteVehicleById(vehicleId);
-    setVehicleNotice('success', 'Vehicle deleted successfully. Refreshing list...');
+    await patchVehicleStatus(vehicleId, action);
+    setVehicleNotice('success', `Vehicle ${actionLabel} successfully.`);
     await loadVehiclesFromApi();
   } catch (error) {
     setVehicleNotice('danger', error.message);
   } finally {
-    deleteButton.disabled = false;
-    deleteButton.innerHTML = '<i class="bi bi-trash3 me-1"></i>Delete';
+    clickedButton.disabled = false;
   }
 });
 
