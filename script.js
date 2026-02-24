@@ -19,8 +19,6 @@ const liveTrips = [
 // API endpoints and auth storage
 // ================================
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
-const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
-const DELETE_VEHICLE_API_URL = 'http://localhost:8000/api/admin/deleteVehicle';
 const ROLES_API_URL = 'http://localhost:8000/api/admin/getRoles';
 const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
@@ -37,21 +35,11 @@ const loginError = document.getElementById('loginError');
 const refreshBtn = document.getElementById('refreshBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const dashboardPage = document.getElementById('dashboardPage');
-const vehiclesPage = document.getElementById('vehiclesPage');
 const dashboardNav = document.getElementById('dashboardNav');
-const vehiclesNav = document.getElementById('vehiclesNav');
 const usersNav = document.getElementById('usersNav');
 const rolesNav = document.getElementById('rolesNav');
 const pageTitle = document.getElementById('pageTitle');
 const pageDescription = document.getElementById('pageDescription');
-const vehicleTableBody = document.getElementById('vehicleTableBody');
-const vehicleApiNotice = document.getElementById('vehicleApiNotice');
-const loadVehiclesBtn = document.getElementById('loadVehiclesBtn');
-const vehicleSearchInput = document.getElementById('vehicleSearchInput');
-const showDeletedVehiclesBtn = document.getElementById('showDeletedVehiclesBtn');
-const hideDeletedVehiclesBtn = document.getElementById('hideDeletedVehiclesBtn');
-const deletedVehiclesPanel = document.getElementById('deletedVehiclesPanel');
-const deletedVehicleTableBody = document.getElementById('deletedVehicleTableBody');
 const usersPage = document.getElementById('usersPage');
 const userTableBody = document.getElementById('userTableBody');
 const userApiNotice = document.getElementById('userApiNotice');
@@ -69,8 +57,6 @@ const saveRoleBtn = document.getElementById('saveRoleBtn');
 const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
-let allVehicles = [];
-let deletedVehicles = [];
 let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
@@ -186,236 +172,6 @@ function renderTrips() {
       <td>${trip.eta}</td>
     </tr>
   `).join('');
-}
-
-// ================================
-// Vehicles
-// ================================
-function vehicleStatusBadge(status) {
-  const currentStatus = (status || '').toLowerCase();
-
-  if (currentStatus.includes('available') || currentStatus.includes('active')) {
-    return 'bg-success';
-  }
-
-  if (currentStatus.includes('trip') || currentStatus.includes('busy')) {
-    return 'bg-warning text-dark';
-  }
-
-  if (currentStatus.includes('offline') || currentStatus.includes('inactive')) {
-    return 'bg-secondary';
-  }
-
-  return 'bg-info text-dark';
-}
-
-function formatDriverAddress(rawAddress) {
-  if (!rawAddress) {
-    return 'N/A';
-  }
-
-  if (typeof rawAddress === 'string') {
-    return rawAddress;
-  }
-
-  const orderedParts = [
-    rawAddress.street,
-    rawAddress.road,
-    rawAddress.township,
-    rawAddress.city
-  ].filter(Boolean);
-
-  return orderedParts.length ? orderedParts.join(', ') : 'N/A';
-}
-
-function mapVehicle(rawVehicle) {
-  return {
-    id: rawVehicle.id || rawVehicle.vehicleId || rawVehicle.userId || null,
-    plateNumber: rawVehicle.plateNumber || rawVehicle.vehiclePlateNumber || rawVehicle.plateNo || 'N/A',
-    driverId: rawVehicle.driverId || rawVehicle.userId || rawVehicle.driver?.id || rawVehicle.user?.id || 'N/A',
-    contact: rawVehicle.contact || rawVehicle.phone || rawVehicle.mobile || rawVehicle.driver?.contact || rawVehicle.user?.phone || 'N/A',
-    status: rawVehicle.status || rawVehicle.vehicleStatus || rawVehicle.driverStatus || 'Unknown',
-    address: formatDriverAddress(rawVehicle.address || rawVehicle.currentAddress || rawVehicle.locationAddress || rawVehicle.location)
-  };
-}
-
-function setVehicleNotice(type, message) {
-  vehicleApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
-  vehicleApiNotice.textContent = message;
-}
-
-// Backward-compatible no-op kept intentionally because some previously shipped
-// builds still invoke this function while rendering vehicles.
-function renderDeletedVehicles() {
-  return;
-}
-
-function renderVehicles(vehicles) {
-  if (!vehicles.length) {
-    vehicleTableBody.innerHTML = `
-      <tr>
-        <td colspan="7" class="text-center text-muted py-4">No vehicles found.</td>
-      </tr>
-    `;
-    return;
-  }
-
-  vehicleTableBody.innerHTML = vehicles.map((vehicle, index) => `
-    <tr>
-      <td>${index + 1}</td>
-      <td class="fw-semibold">${vehicle.plateNumber}</td>
-      <td>${vehicle.driverId}</td>
-      <td>${vehicle.contact}</td>
-      <td>${vehicle.address}</td>
-      <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
-      <td>
-        <button class="btn btn-sm btn-outline-danger js-delete-vehicle" data-id="${vehicle.id ?? ''}" data-plate="${vehicle.plateNumber}">Delete</button>
-      </td>
-    </tr>
-  `).join('');
-}
-
-function filterVehicleList() {
-  const query = vehicleSearchInput.value.trim().toLowerCase();
-
-  const filteredVehicles = allVehicles.filter((vehicle) => (
-    vehicle.plateNumber.toLowerCase().includes(query)
-      || String(vehicle.driverId).toLowerCase().includes(query)
-      || vehicle.contact.toLowerCase().includes(query)
-      || vehicle.status.toLowerCase().includes(query)
-      || vehicle.address.toLowerCase().includes(query)
-  ));
-
-  renderVehicles(filteredVehicles);
-}
-
-async function readResponseMessage(response) {
-  try {
-    const responseBody = await response.json();
-    return responseBody?.message || responseBody?.error || '';
-  } catch (error) {
-    return '';
-  }
-}
-
-async function deleteVehicle(vehicle) {
-  const vehicleId = vehicle.id;
-
-  if (!vehicleId) {
-    throw new Error(`Cannot delete vehicle ${vehicle.plateNumber}. Missing vehicle id.`);
-  }
-
-  const authHeaders = getAuthHeaders();
-  const attempts = [
-    {
-      method: 'POST',
-      headers: { ...authHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: vehicleId, vehicleId, plateNumber: vehicle.plateNumber, userId: vehicle.driverId })
-    },
-    {
-      method: 'POST',
-      headers: { ...authHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vehicleId, plateNumber: vehicle.plateNumber })
-    },
-    {
-      method: 'DELETE',
-      headers: authHeaders,
-      body: undefined,
-      url: `${DELETE_VEHICLE_API_URL}?vehicleId=${encodeURIComponent(vehicleId)}`
-    }
-  ];
-
-  let lastErrorMessage = '';
-
-  for (const attempt of attempts) {
-    const response = await fetch(attempt.url || DELETE_VEHICLE_API_URL, {
-      method: attempt.method,
-      headers: attempt.headers,
-      ...(attempt.body ? { body: attempt.body } : {})
-    });
-
-    if (response.ok) {
-      return;
-    }
-
-    const responseMessage = await readResponseMessage(response);
-
-    if (response.status === 401) {
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    if (response.status === 403) {
-      lastErrorMessage = responseMessage || 'Delete permission denied by API (403).';
-      continue;
-    }
-
-    lastErrorMessage = responseMessage || `Delete API failed with status ${response.status}`;
-  }
-
-  throw new Error(lastErrorMessage || 'Delete request was rejected by API.');
-}
-
-async function handleDeleteVehicle(vehicleId, plateNumber) {
-  const vehicle = allVehicles.find((item) => String(item.id) === String(vehicleId) && item.plateNumber === plateNumber)
-    || allVehicles.find((item) => item.plateNumber === plateNumber);
-
-  if (!vehicle) {
-    setVehicleNotice('warning', `Vehicle ${plateNumber} is not available in current list.`);
-    return;
-  }
-
-  const isConfirmed = window.confirm(`Are you sure you want to delete vehicle ${plateNumber}?`);
-
-  if (!isConfirmed) {
-    return;
-  }
-
-  try {
-    await deleteVehicle(vehicle);
-    allVehicles = allVehicles.filter((item) => item !== vehicle);
-    filterVehicleList();
-    setVehicleNotice('success', `Vehicle ${plateNumber} deleted successfully.`);
-  } catch (error) {
-    setVehicleNotice('danger', `Failed to delete vehicle ${plateNumber}. ${error.message}`);
-  }
-}
-
-async function loadVehiclesFromApi() {
-  try {
-    getAuthHeaders();
-  } catch (error) {
-    setVehicleNotice('warning', error.message);
-    showLogin();
-    return;
-  }
-
-  setVehicleNotice('info', `Loading vehicles from ${VEHICLE_API_URL} ...`);
-
-  try {
-    const response = await fetch(VEHICLE_API_URL, {
-      headers: getAuthHeaders()
-    });
-
-    if (response.status === 401 || response.status === 403) {
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    if (!response.ok) {
-      throw new Error(`API failed with status ${response.status}`);
-    }
-
-    const responseBody = await response.json();
-    const list = extractCollection(responseBody, ['vehicles']);
-    allVehicles = list.map((vehicle) => mapVehicle(vehicle));
-
-    filterVehicleList();
-    renderDeletedVehicles();
-    setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles from API.`);
-  } catch (error) {
-    allVehicles = [];
-    renderVehicles([]);
-    setVehicleNotice('danger', `Failed to load vehicles from API. ${error.message}`);
-  }
 }
 
 // ================================
@@ -880,11 +636,9 @@ async function createRole(roleName) {
 // ================================
 function showDashboardPage() {
   dashboardPage.classList.remove('d-none');
-  vehiclesPage.classList.add('d-none');
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   dashboardNav.classList.add('active');
-  vehiclesNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.remove('active');
   pageTitle.textContent = 'O_way Admin Overview';
@@ -893,32 +647,11 @@ function showDashboardPage() {
   window.location.hash = 'dashboard';
 }
 
-function showVehiclesPage() {
-  dashboardPage.classList.add('d-none');
-  vehiclesPage.classList.remove('d-none');
-  usersPage.classList.add('d-none');
-  rolesPage.classList.add('d-none');
-  dashboardNav.classList.remove('active');
-  vehiclesNav.classList.add('active');
-  usersNav.classList.remove('active');
-  rolesNav.classList.remove('active');
-  pageTitle.textContent = 'Vehicles';
-  pageDescription.textContent = 'Search and monitor live vehicle records from the admin API.';
-  refreshBtn.classList.add('d-none');
-  window.location.hash = 'vehicles';
-
-  if (!allVehicles.length) {
-    loadVehiclesFromApi();
-  }
-}
-
 function showUsersPage() {
   dashboardPage.classList.add('d-none');
-  vehiclesPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   usersPage.classList.remove('d-none');
   dashboardNav.classList.remove('active');
-  vehiclesNav.classList.remove('active');
   usersNav.classList.add('active');
   rolesNav.classList.remove('active');
   pageTitle.textContent = 'Users';
@@ -945,11 +678,9 @@ function showUsersPage() {
 
 function showRolesPage() {
   dashboardPage.classList.add('d-none');
-  vehiclesPage.classList.add('d-none');
   usersPage.classList.add('d-none');
   rolesPage.classList.remove('d-none');
   dashboardNav.classList.remove('active');
-  vehiclesNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.add('active');
   pageTitle.textContent = 'Roles';
@@ -991,13 +722,6 @@ function showDashboard() {
   dashboardView.classList.remove('d-none');
   renderStats();
   renderTrips();
-  renderVehicles([]);
-  setVehicleNotice('info', 'Open Vehicles page to load data from API.');
-
-  if (window.location.hash === '#vehicles') {
-    showVehiclesPage();
-    return;
-  }
 
   if (window.location.hash === '#roles') {
     showRolesPage();
@@ -1098,11 +822,6 @@ dashboardNav.addEventListener('click', (event) => {
   showDashboardPage();
 });
 
-vehiclesNav.addEventListener('click', (event) => {
-  event.preventDefault();
-  showVehiclesPage();
-});
-
 usersNav.addEventListener('click', (event) => {
   event.preventDefault();
   showUsersPage();
@@ -1140,7 +859,6 @@ roleCreateForm.addEventListener('submit', async (event) => {
   }
 });
 
-vehicleSearchInput.addEventListener('input', filterVehicleList);
 userSearchInput.addEventListener('input', filterUsers);
 
 userTableBody.addEventListener('click', (event) => {
@@ -1163,17 +881,6 @@ userTableBody.addEventListener('click', (event) => {
 
 refreshBtn.addEventListener('click', refreshDashboard);
 logoutBtn.addEventListener('click', logout);
-loadVehiclesBtn.addEventListener('click', loadVehiclesFromApi);
-
-vehicleTableBody.addEventListener('click', (event) => {
-  const deleteButton = event.target.closest('.js-delete-vehicle');
-
-  if (!deleteButton) {
-    return;
-  }
-
-  handleDeleteVehicle(deleteButton.dataset.id, deleteButton.dataset.plate);
-});
 
 
 // ================================
