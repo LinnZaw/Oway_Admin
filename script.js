@@ -48,6 +48,10 @@ const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
 const loadVehiclesBtn = document.getElementById('loadVehiclesBtn');
 const vehicleSearchInput = document.getElementById('vehicleSearchInput');
+const showDeletedVehiclesBtn = document.getElementById('showDeletedVehiclesBtn');
+const hideDeletedVehiclesBtn = document.getElementById('hideDeletedVehiclesBtn');
+const deletedVehiclesPanel = document.getElementById('deletedVehiclesPanel');
+const deletedVehicleTableBody = document.getElementById('deletedVehicleTableBody');
 const usersPage = document.getElementById('usersPage');
 const userTableBody = document.getElementById('userTableBody');
 const userApiNotice = document.getElementById('userApiNotice');
@@ -66,6 +70,7 @@ const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
 let allVehicles = [];
+let deletedVehicles = [];
 let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
@@ -278,6 +283,79 @@ function filterVehicleList() {
   renderVehicles(filteredVehicles);
 }
 
+function renderDeletedVehicles() {
+  if (!deletedVehicleTableBody) {
+    return;
+  }
+
+  if (!deletedVehicles.length) {
+    deletedVehicleTableBody.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center text-muted py-3">No deleted vehicles yet.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  deletedVehicleTableBody.innerHTML = deletedVehicles.map((vehicle, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td class="fw-semibold">${vehicle.plateNumber}</td>
+      <td>${vehicle.driverName}</td>
+      <td>${vehicle.contact}</td>
+      <td>${vehicle.address}</td>
+      <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
+    </tr>
+  `).join('');
+}
+
+async function deleteVehicle(vehicleId, plateNumber) {
+  if (!vehicleId) {
+    throw new Error(`Cannot delete vehicle ${plateNumber}. Missing vehicle id.`);
+  }
+
+  const response = await fetch(DELETE_VEHICLE_API_URL, {
+    method: 'POST',
+    headers: getAuthHeaders(true),
+    body: JSON.stringify({ id: Number(vehicleId) || vehicleId })
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  if (!response.ok) {
+    throw new Error(`Delete API failed with status ${response.status}`);
+  }
+}
+
+async function handleDeleteVehicle(vehicleId, plateNumber) {
+  const vehicle = allVehicles.find((item) => String(item.id) === String(vehicleId) && item.plateNumber === plateNumber)
+    || allVehicles.find((item) => item.plateNumber === plateNumber);
+
+  if (!vehicle) {
+    setVehicleNotice('warning', `Vehicle ${plateNumber} is not available in current list.`);
+    return;
+  }
+
+  const isConfirmed = window.confirm(`Are you sure you want to delete vehicle ${plateNumber}?`);
+
+  if (!isConfirmed) {
+    return;
+  }
+
+  try {
+    await deleteVehicle(vehicle.id, plateNumber);
+    allVehicles = allVehicles.filter((item) => item !== vehicle);
+    deletedVehicles = [vehicle, ...deletedVehicles];
+    filterVehicleList();
+    renderDeletedVehicles();
+    setVehicleNotice('success', `Vehicle ${plateNumber} deleted successfully.`);
+  } catch (error) {
+    setVehicleNotice('danger', `Failed to delete vehicle ${plateNumber}. ${error.message}`);
+  }
+}
+
 async function loadVehiclesFromApi() {
   try {
     getAuthHeaders();
@@ -307,6 +385,7 @@ async function loadVehiclesFromApi() {
     allVehicles = list.map((vehicle) => mapVehicle(vehicle));
 
     filterVehicleList();
+    renderDeletedVehicles();
     setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles from API.`);
   } catch (error) {
     allVehicles = [];
