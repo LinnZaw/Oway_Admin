@@ -20,6 +20,7 @@ const liveTrips = [
 // ================================
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
 const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
+const DELETE_VEHICLE_API_URL = 'http://localhost:8000/api/admin/deleteVehicle';
 const ROLES_API_URL = 'http://localhost:8000/api/admin/getRoles';
 const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
@@ -47,6 +48,10 @@ const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
 const loadVehiclesBtn = document.getElementById('loadVehiclesBtn');
 const vehicleSearchInput = document.getElementById('vehicleSearchInput');
+const showDeletedVehiclesBtn = document.getElementById('showDeletedVehiclesBtn');
+const hideDeletedVehiclesBtn = document.getElementById('hideDeletedVehiclesBtn');
+const deletedVehiclesPanel = document.getElementById('deletedVehiclesPanel');
+const deletedVehicleTableBody = document.getElementById('deletedVehicleTableBody');
 const usersPage = document.getElementById('usersPage');
 const userTableBody = document.getElementById('userTableBody');
 const userApiNotice = document.getElementById('userApiNotice');
@@ -65,6 +70,7 @@ const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
 let allVehicles = [];
+let deletedVehicles = [];
 let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
@@ -203,12 +209,33 @@ function vehicleStatusBadge(status) {
   return 'bg-info text-dark';
 }
 
+function formatDriverAddress(rawAddress) {
+  if (!rawAddress) {
+    return 'N/A';
+  }
+
+  if (typeof rawAddress === 'string') {
+    return rawAddress;
+  }
+
+  const orderedParts = [
+    rawAddress.street,
+    rawAddress.road,
+    rawAddress.township,
+    rawAddress.city
+  ].filter(Boolean);
+
+  return orderedParts.length ? orderedParts.join(', ') : 'N/A';
+}
+
 function mapVehicle(rawVehicle) {
   return {
+    id: rawVehicle.id || rawVehicle.vehicleId || rawVehicle.userId || null,
     plateNumber: rawVehicle.plateNumber || rawVehicle.vehiclePlateNumber || rawVehicle.plateNo || 'N/A',
-    contact: rawVehicle.contact || rawVehicle.phone || rawVehicle.mobile || 'N/A',
-    status: rawVehicle.status || rawVehicle.vehicleStatus || 'Unknown',
-    address: rawVehicle.address || rawVehicle.currentAddress || rawVehicle.location || 'N/A'
+    driverName: rawVehicle.driverName || rawVehicle.name || rawVehicle.driver?.name || rawVehicle.user?.name || 'N/A',
+    contact: rawVehicle.contact || rawVehicle.phone || rawVehicle.mobile || rawVehicle.driver?.contact || rawVehicle.user?.phone || 'N/A',
+    status: rawVehicle.status || rawVehicle.vehicleStatus || rawVehicle.driverStatus || 'Unknown',
+    address: formatDriverAddress(rawVehicle.address || rawVehicle.currentAddress || rawVehicle.locationAddress || rawVehicle.location)
   };
 }
 
@@ -221,18 +248,23 @@ function renderVehicles(vehicles) {
   if (!vehicles.length) {
     vehicleTableBody.innerHTML = `
       <tr>
-        <td colspan="4" class="text-center text-muted py-4">No vehicles found.</td>
+        <td colspan="7" class="text-center text-muted py-4">No vehicles found.</td>
       </tr>
     `;
     return;
   }
 
-  vehicleTableBody.innerHTML = vehicles.map((vehicle) => `
+  vehicleTableBody.innerHTML = vehicles.map((vehicle, index) => `
     <tr>
+      <td>${index + 1}</td>
       <td class="fw-semibold">${vehicle.plateNumber}</td>
+      <td>${vehicle.driverName}</td>
       <td>${vehicle.contact}</td>
-      <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
       <td>${vehicle.address}</td>
+      <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
+      <td>
+        <button class="btn btn-sm btn-outline-danger js-delete-vehicle" data-id="${vehicle.id ?? ''}" data-plate="${vehicle.plateNumber}">Delete</button>
+      </td>
     </tr>
   `).join('');
 }
@@ -242,12 +274,86 @@ function filterVehicleList() {
 
   const filteredVehicles = allVehicles.filter((vehicle) => (
     vehicle.plateNumber.toLowerCase().includes(query)
+      || vehicle.driverName.toLowerCase().includes(query)
       || vehicle.contact.toLowerCase().includes(query)
       || vehicle.status.toLowerCase().includes(query)
       || vehicle.address.toLowerCase().includes(query)
   ));
 
   renderVehicles(filteredVehicles);
+}
+
+function renderDeletedVehicles() {
+  if (!deletedVehicleTableBody) {
+    return;
+  }
+
+  if (!deletedVehicles.length) {
+    deletedVehicleTableBody.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center text-muted py-3">No deleted vehicles yet.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  deletedVehicleTableBody.innerHTML = deletedVehicles.map((vehicle, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td class="fw-semibold">${vehicle.plateNumber}</td>
+      <td>${vehicle.driverName}</td>
+      <td>${vehicle.contact}</td>
+      <td>${vehicle.address}</td>
+      <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
+    </tr>
+  `).join('');
+}
+
+async function deleteVehicle(vehicleId, plateNumber) {
+  if (!vehicleId) {
+    throw new Error(`Cannot delete vehicle ${plateNumber}. Missing vehicle id.`);
+  }
+
+  const response = await fetch(DELETE_VEHICLE_API_URL, {
+    method: 'POST',
+    headers: getAuthHeaders(true),
+    body: JSON.stringify({ id: Number(vehicleId) || vehicleId })
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  if (!response.ok) {
+    throw new Error(`Delete API failed with status ${response.status}`);
+  }
+}
+
+async function handleDeleteVehicle(vehicleId, plateNumber) {
+  const vehicle = allVehicles.find((item) => String(item.id) === String(vehicleId) && item.plateNumber === plateNumber)
+    || allVehicles.find((item) => item.plateNumber === plateNumber);
+
+  if (!vehicle) {
+    setVehicleNotice('warning', `Vehicle ${plateNumber} is not available in current list.`);
+    return;
+  }
+
+  const isConfirmed = window.confirm(`Are you sure you want to delete vehicle ${plateNumber}?`);
+
+  if (!isConfirmed) {
+    return;
+  }
+
+  try {
+    await deleteVehicle(vehicle.id, plateNumber);
+    allVehicles = allVehicles.filter((item) => item !== vehicle);
+    deletedVehicles = [vehicle, ...deletedVehicles];
+    filterVehicleList();
+    renderDeletedVehicles();
+    setVehicleNotice('success', `Vehicle ${plateNumber} deleted successfully.`);
+  } catch (error) {
+    setVehicleNotice('danger', `Failed to delete vehicle ${plateNumber}. ${error.message}`);
+  }
 }
 
 async function loadVehiclesFromApi() {
@@ -276,9 +382,10 @@ async function loadVehiclesFromApi() {
 
     const responseBody = await response.json();
     const list = extractCollection(responseBody, ['vehicles']);
-    allVehicles = list.map(mapVehicle);
+    allVehicles = list.map((vehicle) => mapVehicle(vehicle));
 
     filterVehicleList();
+    renderDeletedVehicles();
     setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles from API.`);
   } catch (error) {
     allVehicles = [];
@@ -1033,6 +1140,25 @@ userTableBody.addEventListener('click', (event) => {
 refreshBtn.addEventListener('click', refreshDashboard);
 logoutBtn.addEventListener('click', logout);
 loadVehiclesBtn.addEventListener('click', loadVehiclesFromApi);
+
+vehicleTableBody.addEventListener('click', (event) => {
+  const deleteButton = event.target.closest('.js-delete-vehicle');
+
+  if (!deleteButton) {
+    return;
+  }
+
+  handleDeleteVehicle(deleteButton.dataset.id, deleteButton.dataset.plate);
+});
+
+showDeletedVehiclesBtn?.addEventListener('click', () => {
+  deletedVehiclesPanel?.classList.remove('d-none');
+  renderDeletedVehicles();
+});
+
+hideDeletedVehiclesBtn?.addEventListener('click', () => {
+  deletedVehiclesPanel?.classList.add('d-none');
+});
 
 // ================================
 // App bootstrap
