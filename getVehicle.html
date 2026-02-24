@@ -116,17 +116,13 @@
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
               <div>
                 <h3 class="h5 mb-1 fw-bold">Vehicle List</h3>
-                <p class="text-muted mb-0 small">Vehicle list with plate number, driver name, contact, address and status from API.</p>
-              </div>
-              <div class="d-flex gap-2 align-self-lg-start">
-                <button id="showDeletedVehiclesBtn" class="btn btn-warning btn-sm fw-semibold">Show Deleted Vehicles</button>
-                <button id="loadVehiclesBtn" class="btn btn-outline-dark btn-sm fw-semibold">Reload Vehicles</button>
+                <p class="text-muted mb-0 small">Vehicle list with plate number, driver id, contact, address and status from API.</p>
               </div>
             </div>
 
             <div class="input-group mb-3">
               <span class="input-group-text"><i class="bi bi-search"></i></span>
-              <input id="vehicleSearchInput" type="text" class="form-control" placeholder="Search by plate number, driver name, contact, status or address" />
+              <input id="vehicleSearchInput" type="text" class="form-control" placeholder="Search by plate number, driver id, contact, status or address" />
             </div>
 
             <div id="vehicleApiNotice" class="alert alert-info py-2 px-3 small mb-3">
@@ -139,7 +135,7 @@
                   <tr>
                     <th>No.</th>
                     <th>Plate Number</th>
-                    <th>Driver Name</th>
+                    <th>Driver ID</th>
                     <th>Contact</th>
                     <th>Address</th>
                     <th>Status</th>
@@ -150,31 +146,7 @@
               </table>
             </div>
 
-            <div id="deletedVehiclesPanel" class="border rounded-3 p-3 mt-3 d-none bg-light-subtle">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h4 class="h6 fw-bold mb-0">Deleted Vehicle List</h4>
-                <button id="hideDeletedVehiclesBtn" class="btn btn-outline-secondary btn-sm">Hide</button>
-              </div>
-              <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>No.</th>
-                      <th>Plate Number</th>
-                      <th>Driver Name</th>
-                      <th>Contact</th>
-                      <th>Address</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody id="deletedVehicleTableBody">
-                    <tr>
-                      <td colspan="6" class="text-center text-muted py-3">No deleted vehicles yet.</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            
           </div>
         </section>
       </main>

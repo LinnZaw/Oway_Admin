@@ -232,7 +232,7 @@ function mapVehicle(rawVehicle) {
   return {
     id: rawVehicle.id || rawVehicle.vehicleId || rawVehicle.userId || null,
     plateNumber: rawVehicle.plateNumber || rawVehicle.vehiclePlateNumber || rawVehicle.plateNo || 'N/A',
-    driverName: rawVehicle.driverName || rawVehicle.name || rawVehicle.driver?.name || rawVehicle.user?.name || 'N/A',
+    driverId: rawVehicle.driverId || rawVehicle.userId || rawVehicle.driver?.id || rawVehicle.user?.id || 'N/A',
     contact: rawVehicle.contact || rawVehicle.phone || rawVehicle.mobile || rawVehicle.driver?.contact || rawVehicle.user?.phone || 'N/A',
     status: rawVehicle.status || rawVehicle.vehicleStatus || rawVehicle.driverStatus || 'Unknown',
     address: formatDriverAddress(rawVehicle.address || rawVehicle.currentAddress || rawVehicle.locationAddress || rawVehicle.location)
@@ -258,7 +258,7 @@ function renderVehicles(vehicles) {
     <tr>
       <td>${index + 1}</td>
       <td class="fw-semibold">${vehicle.plateNumber}</td>
-      <td>${vehicle.driverName}</td>
+      <td>${vehicle.driverId}</td>
       <td>${vehicle.contact}</td>
       <td>${vehicle.address}</td>
       <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
@@ -274,7 +274,7 @@ function filterVehicleList() {
 
   const filteredVehicles = allVehicles.filter((vehicle) => (
     vehicle.plateNumber.toLowerCase().includes(query)
-      || vehicle.driverName.toLowerCase().includes(query)
+      || String(vehicle.driverId).toLowerCase().includes(query)
       || vehicle.contact.toLowerCase().includes(query)
       || vehicle.status.toLowerCase().includes(query)
       || vehicle.address.toLowerCase().includes(query)
@@ -1151,14 +1151,6 @@ vehicleTableBody.addEventListener('click', (event) => {
   handleDeleteVehicle(deleteButton.dataset.id, deleteButton.dataset.plate);
 });
 
-showDeletedVehiclesBtn?.addEventListener('click', () => {
-  deletedVehiclesPanel?.classList.remove('d-none');
-  renderDeletedVehicles();
-});
-
-hideDeletedVehiclesBtn?.addEventListener('click', () => {
-  deletedVehiclesPanel?.classList.add('d-none');
-});
 
 // ================================
 // App bootstrap
