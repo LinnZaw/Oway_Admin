@@ -283,50 +283,70 @@ function filterVehicleList() {
   renderVehicles(filteredVehicles);
 }
 
-function renderDeletedVehicles() {
-  if (!deletedVehicleTableBody) {
-    return;
+async function readResponseMessage(response) {
+  try {
+    const responseBody = await response.json();
+    return responseBody?.message || responseBody?.error || '';
+  } catch (error) {
+    return '';
   }
-
-  if (!deletedVehicles.length) {
-    deletedVehicleTableBody.innerHTML = `
-      <tr>
-        <td colspan="6" class="text-center text-muted py-3">No deleted vehicles yet.</td>
-      </tr>
-    `;
-    return;
-  }
-
-  deletedVehicleTableBody.innerHTML = deletedVehicles.map((vehicle, index) => `
-    <tr>
-      <td>${index + 1}</td>
-      <td class="fw-semibold">${vehicle.plateNumber}</td>
-      <td>${vehicle.driverName}</td>
-      <td>${vehicle.contact}</td>
-      <td>${vehicle.address}</td>
-      <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
-    </tr>
-  `).join('');
 }
 
-async function deleteVehicle(vehicleId, plateNumber) {
+async function deleteVehicle(vehicle) {
+  const vehicleId = vehicle.id;
+
   if (!vehicleId) {
-    throw new Error(`Cannot delete vehicle ${plateNumber}. Missing vehicle id.`);
+    throw new Error(`Cannot delete vehicle ${vehicle.plateNumber}. Missing vehicle id.`);
   }
 
-  const response = await fetch(DELETE_VEHICLE_API_URL, {
-    method: 'POST',
-    headers: getAuthHeaders(true),
-    body: JSON.stringify({ id: Number(vehicleId) || vehicleId })
-  });
+  const authHeaders = getAuthHeaders();
+  const attempts = [
+    {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: vehicleId, vehicleId, plateNumber: vehicle.plateNumber, userId: vehicle.driverId })
+    },
+    {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vehicleId, plateNumber: vehicle.plateNumber })
+    },
+    {
+      method: 'DELETE',
+      headers: authHeaders,
+      body: undefined,
+      url: `${DELETE_VEHICLE_API_URL}?vehicleId=${encodeURIComponent(vehicleId)}`
+    }
+  ];
 
-  if (response.status === 401 || response.status === 403) {
-    throw new Error('Session expired. Please log in again.');
+  let lastErrorMessage = '';
+
+  for (const attempt of attempts) {
+    const response = await fetch(attempt.url || DELETE_VEHICLE_API_URL, {
+      method: attempt.method,
+      headers: attempt.headers,
+      ...(attempt.body ? { body: attempt.body } : {})
+    });
+
+    if (response.ok) {
+      return;
+    }
+
+    const responseMessage = await readResponseMessage(response);
+
+    if (response.status === 401) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (response.status === 403) {
+      lastErrorMessage = responseMessage || 'Delete permission denied by API (403).';
+      continue;
+    }
+
+    lastErrorMessage = responseMessage || `Delete API failed with status ${response.status}`;
   }
 
-  if (!response.ok) {
-    throw new Error(`Delete API failed with status ${response.status}`);
-  }
+  throw new Error(lastErrorMessage || 'Delete request was rejected by API.');
 }
 
 async function handleDeleteVehicle(vehicleId, plateNumber) {
@@ -345,11 +365,9 @@ async function handleDeleteVehicle(vehicleId, plateNumber) {
   }
 
   try {
-    await deleteVehicle(vehicle.id, plateNumber);
+    await deleteVehicle(vehicle);
     allVehicles = allVehicles.filter((item) => item !== vehicle);
-    deletedVehicles = [vehicle, ...deletedVehicles];
     filterVehicleList();
-    renderDeletedVehicles();
     setVehicleNotice('success', `Vehicle ${plateNumber} deleted successfully.`);
   } catch (error) {
     setVehicleNotice('danger', `Failed to delete vehicle ${plateNumber}. ${error.message}`);
