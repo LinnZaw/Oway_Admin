@@ -23,6 +23,7 @@ const ROLES_API_URL = 'http://localhost:8000/api/admin/getRoles';
 const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
+const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 // ================================
@@ -38,6 +39,7 @@ const dashboardPage = document.getElementById('dashboardPage');
 const dashboardNav = document.getElementById('dashboardNav');
 const usersNav = document.getElementById('usersNav');
 const rolesNav = document.getElementById('rolesNav');
+const vehiclesNav = document.getElementById('vehiclesNav');
 const pageTitle = document.getElementById('pageTitle');
 const pageDescription = document.getElementById('pageDescription');
 const usersPage = document.getElementById('usersPage');
@@ -55,11 +57,15 @@ const roleCreateForm = document.getElementById('roleCreateForm');
 const roleNameInput = document.getElementById('roleNameInput');
 const saveRoleBtn = document.getElementById('saveRoleBtn');
 const cancelRoleBtn = document.getElementById('cancelRoleBtn');
+const vehiclesPage = document.getElementById('vehiclesPage');
+const vehicleTableBody = document.getElementById('vehicleTableBody');
+const vehicleApiNotice = document.getElementById('vehicleApiNotice');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
 let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
+let allVehicles = [];
 let roleLookupById = new Map();
 
 // ================================
@@ -176,6 +182,145 @@ function renderTrips() {
 // ================================
 // Users & profiles
 // ================================
+
+function setVehicleNotice(type, message) {
+  vehicleApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
+  vehicleApiNotice.textContent = message;
+}
+
+function mapVehicle(rawVehicle) {
+  return {
+    id: rawVehicle.id ?? rawVehicle.vehicleId ?? null,
+    plateNumber: rawVehicle.plateNumber || 'N/A',
+    nrc: rawVehicle.nrc || 'N/A',
+    contact: rawVehicle.contact || 'N/A',
+    ownerName: rawVehicle.user?.name || 'N/A',
+    vehicleStatus: rawVehicle.vehicleStatus || 'UNKNOWN'
+  };
+}
+
+function getVehicleStatusBadgeClass(status) {
+  switch (String(status || '').toUpperCase()) {
+    case 'ACCEPTED':
+      return 'bg-success-subtle text-success-emphasis border border-success-subtle';
+    case 'PENDING':
+      return 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+    case 'REJECTED':
+      return 'bg-danger-subtle text-danger-emphasis border border-danger-subtle';
+    default:
+      return 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle';
+  }
+}
+
+function renderVehicles(vehicles) {
+  if (!vehicles.length) {
+    vehicleTableBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center text-muted py-4">No vehicles found.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  vehicleTableBody.innerHTML = vehicles.map((vehicle, index) => {
+    const normalizedStatus = String(vehicle.vehicleStatus || '').toUpperCase();
+    const actionButtons = normalizedStatus === 'PENDING'
+      ? `
+        <div class="d-flex gap-2">
+          <button class="btn btn-success btn-sm accept-vehicle-btn" data-vehicle-id="${vehicle.id}">
+            <i class="bi bi-check2-circle me-1"></i>Accept
+          </button>
+          <button class="btn btn-danger btn-sm deny-vehicle-btn" data-vehicle-id="${vehicle.id}">
+            <i class="bi bi-x-circle me-1"></i>Deny
+          </button>
+        </div>
+      `
+      : '';
+
+    return `
+      <tr>
+        <td class="fw-semibold">${index + 1}</td>
+        <td class="fw-semibold">${vehicle.plateNumber}</td>
+        <td>${vehicle.nrc}</td>
+        <td>${vehicle.contact}</td>
+        <td>${vehicle.ownerName}</td>
+        <td>
+          <span class="badge rounded-pill fw-semibold ${getVehicleStatusBadgeClass(vehicle.vehicleStatus)}">
+            ${vehicle.vehicleStatus}
+          </span>
+        </td>
+        <td>${actionButtons}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function patchVehicleStatus(vehicleId, action) {
+  const normalizedAction = String(action || '').toLowerCase();
+
+  if (!['accept', 'deny'].includes(normalizedAction)) {
+    throw new Error('Invalid vehicle action.');
+  }
+
+  const response = await fetch(`http://localhost:8000/api/admin/vehicles/${vehicleId}/${normalizedAction}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders()
+  });
+
+  let responseBody = {};
+
+  try {
+    responseBody = await response.json();
+  } catch {
+    responseBody = {};
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  if (!response.ok) {
+    throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${response.status}`);
+  }
+}
+
+async function loadVehiclesFromApi() {
+  try {
+    getAuthHeaders();
+  } catch (error) {
+    setVehicleNotice('warning', error.message);
+    showLogin();
+    return;
+  }
+
+  setVehicleNotice('info', `Loading vehicles from ${VEHICLES_API_URL} ...`);
+
+  try {
+    const response = await fetch(VEHICLES_API_URL, {
+      headers: getAuthHeaders()
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`API failed with status ${response.status}`);
+    }
+
+    const responseBody = await response.json();
+    const list = extractCollection(responseBody, ['vehicles']);
+
+    allVehicles = list.map(mapVehicle);
+    renderVehicles(allVehicles);
+    setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles from API.`);
+  } catch (error) {
+    allVehicles = [];
+    renderVehicles([]);
+    setVehicleNotice('danger', `Failed to load vehicles from API. ${error.message}`);
+  }
+}
+
 function setUserNotice(type, message) {
   userApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
   userApiNotice.textContent = message;
@@ -637,9 +782,11 @@ function showDashboardPage() {
   dashboardPage.classList.remove('d-none');
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
+  vehiclesPage.classList.add('d-none');
   dashboardNav.classList.add('active');
   usersNav.classList.remove('active');
   rolesNav.classList.remove('active');
+  vehiclesNav.classList.remove('active');
   pageTitle.textContent = 'O_way Admin Overview';
   pageDescription.textContent = 'Manage your yellow 3-wheeler ride network in one place.';
   refreshBtn.classList.remove('d-none');
@@ -649,10 +796,12 @@ function showDashboardPage() {
 function showUsersPage() {
   dashboardPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
+  vehiclesPage.classList.add('d-none');
   usersPage.classList.remove('d-none');
   dashboardNav.classList.remove('active');
   usersNav.classList.add('active');
   rolesNav.classList.remove('active');
+  vehiclesNav.classList.remove('active');
   pageTitle.textContent = 'Users';
   pageDescription.textContent = 'Search users by name or role and open profiles.';
   refreshBtn.classList.add('d-none');
@@ -678,10 +827,12 @@ function showUsersPage() {
 function showRolesPage() {
   dashboardPage.classList.add('d-none');
   usersPage.classList.add('d-none');
+  vehiclesPage.classList.add('d-none');
   rolesPage.classList.remove('d-none');
   dashboardNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.add('active');
+  vehiclesNav.classList.remove('active');
   pageTitle.textContent = 'Roles';
   pageDescription.textContent = 'Create and manage admin roles.';
   refreshBtn.classList.add('d-none');
@@ -692,6 +843,23 @@ function showRolesPage() {
   if (!allRoles.length) {
     loadRolesFromApi();
   }
+}
+
+function showVehiclesPage() {
+  dashboardPage.classList.add('d-none');
+  usersPage.classList.add('d-none');
+  rolesPage.classList.add('d-none');
+  vehiclesPage.classList.remove('d-none');
+  dashboardNav.classList.remove('active');
+  usersNav.classList.remove('active');
+  rolesNav.classList.remove('active');
+  vehiclesNav.classList.add('active');
+  pageTitle.textContent = 'Vehicles';
+  pageDescription.textContent = 'View and manage all registered vehicles.';
+  refreshBtn.classList.add('d-none');
+  window.location.hash = 'vehicles';
+
+  loadVehiclesFromApi();
 }
 
 function sendAlert() {
@@ -729,6 +897,11 @@ function showDashboard() {
 
   if (window.location.hash === '#users') {
     showUsersPage();
+    return;
+  }
+
+  if (window.location.hash === '#vehicles') {
+    showVehiclesPage();
     return;
   }
 
@@ -831,6 +1004,11 @@ rolesNav.addEventListener('click', (event) => {
   showRolesPage();
 });
 
+vehiclesNav.addEventListener('click', (event) => {
+  event.preventDefault();
+  showVehiclesPage();
+});
+
 addRoleBtn.addEventListener('click', () => {
   setRoleFormVisible(true);
   roleNameInput.focus();
@@ -875,6 +1053,38 @@ userTableBody.addEventListener('click', (event) => {
 
   if (copyButton) {
     copyUserId(copyButton.dataset.userId || '');
+  }
+});
+
+vehicleTableBody.addEventListener('click', async (event) => {
+  const acceptButton = event.target.closest('.accept-vehicle-btn');
+  const denyButton = event.target.closest('.deny-vehicle-btn');
+
+  if (!acceptButton && !denyButton) {
+    return;
+  }
+
+  const clickedButton = acceptButton || denyButton;
+  const vehicleId = clickedButton.dataset.vehicleId;
+
+  if (!vehicleId) {
+    setVehicleNotice('danger', 'Vehicle ID is missing.');
+    return;
+  }
+
+  const action = acceptButton ? 'accept' : 'deny';
+  const actionLabel = action === 'accept' ? 'accepted' : 'denied';
+
+  clickedButton.disabled = true;
+
+  try {
+    await patchVehicleStatus(vehicleId, action);
+    setVehicleNotice('success', `Vehicle ${actionLabel} successfully.`);
+    await loadVehiclesFromApi();
+  } catch (error) {
+    setVehicleNotice('danger', error.message);
+  } finally {
+    clickedButton.disabled = false;
   }
 });
 
