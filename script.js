@@ -48,6 +48,10 @@ const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
 const loadVehiclesBtn = document.getElementById('loadVehiclesBtn');
 const vehicleSearchInput = document.getElementById('vehicleSearchInput');
+const showDeletedVehiclesBtn = document.getElementById('showDeletedVehiclesBtn');
+const hideDeletedVehiclesBtn = document.getElementById('hideDeletedVehiclesBtn');
+const deletedVehiclesPanel = document.getElementById('deletedVehiclesPanel');
+const deletedVehicleTableBody = document.getElementById('deletedVehicleTableBody');
 const usersPage = document.getElementById('usersPage');
 const userTableBody = document.getElementById('userTableBody');
 const userApiNotice = document.getElementById('userApiNotice');
@@ -66,6 +70,7 @@ const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
 let allVehicles = [];
+let deletedVehicles = [];
 let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
@@ -398,6 +403,7 @@ async function loadVehiclesFromApi() {
     allVehicles = list.map((vehicle) => mapVehicle(vehicle));
 
     filterVehicleList();
+    renderDeletedVehicles();
     setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles from API.`);
   } catch (error) {
     allVehicles = [];
