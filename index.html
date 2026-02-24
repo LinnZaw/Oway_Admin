@@ -46,6 +46,7 @@
           <li class="nav-item"><a id="dashboardNav" class="nav-link active" href="#"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
           <li class="nav-item"><a id="usersNav" class="nav-link" href="#"><i class="bi bi-people"></i> Users</a></li>
           <li class="nav-item"><a id="rolesNav" class="nav-link" href="#"><i class="bi bi-person-badge"></i> Roles</a></li>
+          <li class="nav-item"><a id="vehiclesNav" class="nav-link" href="#"><i class="bi bi-truck-front"></i> Vehicles</a></li>
         </ul>
       </aside>
 
@@ -187,6 +188,36 @@
                   </tr>
                 </thead>
                 <tbody id="roleTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="vehiclesPage" class="px-3 px-md-4 pb-4 d-none">
+          <div class="panel data-form-panel p-3 p-md-4 mb-4 vehicles-panel">
+            <div class="mb-3">
+              <h3 class="h5 mb-1 fw-bold">Vehicles</h3>
+              <p class="text-muted mb-0 small">Monitor all registered vehicles and manage records.</p>
+            </div>
+
+            <div id="vehicleApiNotice" class="alert alert-info py-2 px-3 small mb-3">
+              Open Vehicles page to load data from API.
+            </div>
+
+            <div class="table-responsive vehicle-table-scroll">
+              <table class="table align-middle">
+                <thead>
+                  <tr>
+                    <th style="width: 80px;">No</th>
+                    <th>Plate Number</th>
+                    <th>NRC</th>
+                    <th>Contact</th>
+                    <th>Owner Name</th>
+                    <th style="width: 170px;">Vehicle Status</th>
+                    <th style="width: 140px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="vehicleTableBody"></tbody>
               </table>
             </div>
           </div>
