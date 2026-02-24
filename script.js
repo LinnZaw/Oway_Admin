@@ -244,6 +244,12 @@ function setVehicleNotice(type, message) {
   vehicleApiNotice.textContent = message;
 }
 
+// Backward-compatible no-op kept intentionally because some previously shipped
+// builds still invoke this function while rendering vehicles.
+function renderDeletedVehicles() {
+  return;
+}
+
 function renderVehicles(vehicles) {
   if (!vehicles.length) {
     vehicleTableBody.innerHTML = `
