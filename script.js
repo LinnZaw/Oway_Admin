@@ -107,7 +107,6 @@ function extractCollection(responseBody, preferredKeys = []) {
     responseBody?.records,
     responseBody?.rows,
     responseBody?.users,
-    responseBody?.vehicles,
     responseBody?.roles
   ];
 
