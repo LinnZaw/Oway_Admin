@@ -249,3 +249,19 @@ body {
   border-top: 1px dashed #e2e8f0;
   padding-top: 10px;
 }
+
+.data-form-panel {
+  max-height: calc(100vh - 180px);
+  overflow: auto;
+}
+
+.data-form-panel .table-responsive {
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.data-form-panel table th,
+.data-form-panel table td {
+  white-space: normal;
+  word-break: break-word;
+}

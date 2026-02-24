@@ -19,7 +19,6 @@ const liveTrips = [
 // API endpoints and auth storage
 // ================================
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
-const VEHICLE_API_URL = 'http://localhost:8000/api/admin/getVehicle';
 const ROLES_API_URL = 'http://localhost:8000/api/admin/getRoles';
 const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
@@ -36,17 +35,11 @@ const loginError = document.getElementById('loginError');
 const refreshBtn = document.getElementById('refreshBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const dashboardPage = document.getElementById('dashboardPage');
-const vehiclesPage = document.getElementById('vehiclesPage');
 const dashboardNav = document.getElementById('dashboardNav');
-const vehiclesNav = document.getElementById('vehiclesNav');
 const usersNav = document.getElementById('usersNav');
 const rolesNav = document.getElementById('rolesNav');
 const pageTitle = document.getElementById('pageTitle');
 const pageDescription = document.getElementById('pageDescription');
-const vehicleTableBody = document.getElementById('vehicleTableBody');
-const vehicleApiNotice = document.getElementById('vehicleApiNotice');
-const loadVehiclesBtn = document.getElementById('loadVehiclesBtn');
-const vehicleSearchInput = document.getElementById('vehicleSearchInput');
 const usersPage = document.getElementById('usersPage');
 const userTableBody = document.getElementById('userTableBody');
 const userApiNotice = document.getElementById('userApiNotice');
@@ -64,7 +57,6 @@ const saveRoleBtn = document.getElementById('saveRoleBtn');
 const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
-let allVehicles = [];
 let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
@@ -180,111 +172,6 @@ function renderTrips() {
       <td>${trip.eta}</td>
     </tr>
   `).join('');
-}
-
-// ================================
-// Vehicles
-// ================================
-function vehicleStatusBadge(status) {
-  const currentStatus = (status || '').toLowerCase();
-
-  if (currentStatus.includes('available') || currentStatus.includes('active')) {
-    return 'bg-success';
-  }
-
-  if (currentStatus.includes('trip') || currentStatus.includes('busy')) {
-    return 'bg-warning text-dark';
-  }
-
-  if (currentStatus.includes('offline') || currentStatus.includes('inactive')) {
-    return 'bg-secondary';
-  }
-
-  return 'bg-info text-dark';
-}
-
-function mapVehicle(rawVehicle) {
-  return {
-    plateNumber: rawVehicle.plateNumber || rawVehicle.vehiclePlateNumber || rawVehicle.plateNo || 'N/A',
-    contact: rawVehicle.contact || rawVehicle.phone || rawVehicle.mobile || 'N/A',
-    status: rawVehicle.status || rawVehicle.vehicleStatus || 'Unknown',
-    address: rawVehicle.address || rawVehicle.currentAddress || rawVehicle.location || 'N/A'
-  };
-}
-
-function setVehicleNotice(type, message) {
-  vehicleApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
-  vehicleApiNotice.textContent = message;
-}
-
-function renderVehicles(vehicles) {
-  if (!vehicles.length) {
-    vehicleTableBody.innerHTML = `
-      <tr>
-        <td colspan="4" class="text-center text-muted py-4">No vehicles found.</td>
-      </tr>
-    `;
-    return;
-  }
-
-  vehicleTableBody.innerHTML = vehicles.map((vehicle) => `
-    <tr>
-      <td class="fw-semibold">${vehicle.plateNumber}</td>
-      <td>${vehicle.contact}</td>
-      <td><span class="badge ${vehicleStatusBadge(vehicle.status)}">${vehicle.status}</span></td>
-      <td>${vehicle.address}</td>
-    </tr>
-  `).join('');
-}
-
-function filterVehicleList() {
-  const query = vehicleSearchInput.value.trim().toLowerCase();
-
-  const filteredVehicles = allVehicles.filter((vehicle) => (
-    vehicle.plateNumber.toLowerCase().includes(query)
-      || vehicle.contact.toLowerCase().includes(query)
-      || vehicle.status.toLowerCase().includes(query)
-      || vehicle.address.toLowerCase().includes(query)
-  ));
-
-  renderVehicles(filteredVehicles);
-}
-
-async function loadVehiclesFromApi() {
-  try {
-    getAuthHeaders();
-  } catch (error) {
-    setVehicleNotice('warning', error.message);
-    showLogin();
-    return;
-  }
-
-  setVehicleNotice('info', `Loading vehicles from ${VEHICLE_API_URL} ...`);
-
-  try {
-    const response = await fetch(VEHICLE_API_URL, {
-      headers: getAuthHeaders()
-    });
-
-    if (response.status === 401 || response.status === 403) {
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    if (!response.ok) {
-      throw new Error(`API failed with status ${response.status}`);
-    }
-
-    const responseBody = await response.json();
-    const list = extractCollection(responseBody, ['vehicles']);
-    allVehicles = list.map(mapVehicle);
-
-    filterVehicleList();
-    setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles from API.`);
-  } catch (error) {
-    allVehicles = [];
-    renderVehicles([]);
-    setVehicleNotice('danger', `Failed to load vehicles from API. ${error.message}`);
-  }
 }
 
 // ================================
@@ -749,11 +636,9 @@ async function createRole(roleName) {
 // ================================
 function showDashboardPage() {
   dashboardPage.classList.remove('d-none');
-  vehiclesPage.classList.add('d-none');
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   dashboardNav.classList.add('active');
-  vehiclesNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.remove('active');
   pageTitle.textContent = 'O_way Admin Overview';
@@ -762,32 +647,11 @@ function showDashboardPage() {
   window.location.hash = 'dashboard';
 }
 
-function showVehiclesPage() {
-  dashboardPage.classList.add('d-none');
-  vehiclesPage.classList.remove('d-none');
-  usersPage.classList.add('d-none');
-  rolesPage.classList.add('d-none');
-  dashboardNav.classList.remove('active');
-  vehiclesNav.classList.add('active');
-  usersNav.classList.remove('active');
-  rolesNav.classList.remove('active');
-  pageTitle.textContent = 'Vehicles';
-  pageDescription.textContent = 'Search and monitor live vehicle records from the admin API.';
-  refreshBtn.classList.add('d-none');
-  window.location.hash = 'vehicles';
-
-  if (!allVehicles.length) {
-    loadVehiclesFromApi();
-  }
-}
-
 function showUsersPage() {
   dashboardPage.classList.add('d-none');
-  vehiclesPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   usersPage.classList.remove('d-none');
   dashboardNav.classList.remove('active');
-  vehiclesNav.classList.remove('active');
   usersNav.classList.add('active');
   rolesNav.classList.remove('active');
   pageTitle.textContent = 'Users';
@@ -814,11 +678,9 @@ function showUsersPage() {
 
 function showRolesPage() {
   dashboardPage.classList.add('d-none');
-  vehiclesPage.classList.add('d-none');
   usersPage.classList.add('d-none');
   rolesPage.classList.remove('d-none');
   dashboardNav.classList.remove('active');
-  vehiclesNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.add('active');
   pageTitle.textContent = 'Roles';
@@ -860,13 +722,6 @@ function showDashboard() {
   dashboardView.classList.remove('d-none');
   renderStats();
   renderTrips();
-  renderVehicles([]);
-  setVehicleNotice('info', 'Open Vehicles page to load data from API.');
-
-  if (window.location.hash === '#vehicles') {
-    showVehiclesPage();
-    return;
-  }
 
   if (window.location.hash === '#roles') {
     showRolesPage();
@@ -967,11 +822,6 @@ dashboardNav.addEventListener('click', (event) => {
   showDashboardPage();
 });
 
-vehiclesNav.addEventListener('click', (event) => {
-  event.preventDefault();
-  showVehiclesPage();
-});
-
 usersNav.addEventListener('click', (event) => {
   event.preventDefault();
   showUsersPage();
@@ -1009,7 +859,6 @@ roleCreateForm.addEventListener('submit', async (event) => {
   }
 });
 
-vehicleSearchInput.addEventListener('input', filterVehicleList);
 userSearchInput.addEventListener('input', filterUsers);
 
 userTableBody.addEventListener('click', (event) => {
@@ -1032,7 +881,7 @@ userTableBody.addEventListener('click', (event) => {
 
 refreshBtn.addEventListener('click', refreshDashboard);
 logoutBtn.addEventListener('click', logout);
-loadVehiclesBtn.addEventListener('click', loadVehiclesFromApi);
+
 
 // ================================
 // App bootstrap
