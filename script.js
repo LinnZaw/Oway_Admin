@@ -775,15 +775,15 @@ async function loadRolesFromApi() {
   }
 }
 
-async function createRole(roleName) {
-  if (!roleName) {
+async function createRole(name) {
+  if (!name) {
     throw new Error('Role name is required.');
   }
 
   const response = await fetch(CREATE_ROLE_API_URL, {
     method: 'POST',
     headers: getAuthHeaders(true),
-    body: JSON.stringify({ roleName })
+    body: JSON.stringify({ name })
   });
 
   let responseBody = {};
