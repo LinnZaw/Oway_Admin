@@ -24,7 +24,7 @@ const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
-const UPDATE_VEHICLE_API_URL = 'http://localhost:8000/api/admin/updateVehicle';
+const UPDATE_VEHICLE_API_URL = 'http://localhost:8000/api/admin/';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 // ================================
@@ -271,7 +271,7 @@ async function patchVehicleStatus(vehicleId, action) {
 
   const candidateEndpoints = [
     UPDATE_VEHICLE_API_URL,
-    `${VEHICLES_API_URL}/update`,
+    `${VEHICLES_API_URL}/`,
     `${VEHICLES_API_URL}/status`
   ];
 
@@ -775,15 +775,15 @@ async function loadRolesFromApi() {
   }
 }
 
-async function createRole(roleName) {
-  if (!roleName) {
+async function createRole(name) {
+  if (!name) {
     throw new Error('Role name is required.');
   }
 
   const response = await fetch(CREATE_ROLE_API_URL, {
     method: 'POST',
     headers: getAuthHeaders(true),
-    body: JSON.stringify({ roleName })
+    body: JSON.stringify({ name })
   });
 
   let responseBody = {};
