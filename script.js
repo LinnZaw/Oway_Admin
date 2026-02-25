@@ -24,6 +24,7 @@ const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
+const UPDATE_VEHICLE_API_URL = 'http://localhost:8000/api/admin/updateVehicle';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 // ================================
@@ -262,26 +263,51 @@ async function patchVehicleStatus(vehicleId, action) {
     throw new Error('Invalid vehicle action.');
   }
 
-  const response = await fetch(`http://localhost:8000/api/admin/vehicles/${vehicleId}/${normalizedAction}`, {
-    method: 'PATCH',
-    headers: getAuthHeaders()
-  });
+  // Backend expects a DTO request body for PATCH updates.
+  const payload = {
+    vehicleId: Number(vehicleId),
+    vehicleStatus: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
+  };
 
-  let responseBody = {};
+  const candidateEndpoints = [
+    UPDATE_VEHICLE_API_URL,
+    `${VEHICLES_API_URL}/update`,
+    `${VEHICLES_API_URL}/status`
+  ];
 
-  try {
-    responseBody = await response.json();
-  } catch {
-    responseBody = {};
+  let lastError = null;
+
+  for (const endpoint of candidateEndpoints) {
+    const response = await fetch(endpoint, {
+      method: 'PATCH',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify(payload)
+    });
+
+    let responseBody = {};
+
+    try {
+      responseBody = await response.json();
+    } catch {
+      responseBody = {};
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (response.ok) {
+      return;
+    }
+
+    if (response.status !== 404) {
+      throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${response.status}`);
+    }
+
+    lastError = responseBody?.message || `Endpoint not found: ${endpoint}`;
   }
 
-  if (response.status === 401 || response.status === 403) {
-    throw new Error('Session expired. Please log in again.');
-  }
-
-  if (!response.ok) {
-    throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${response.status}`);
-  }
+  throw new Error(lastError || `Failed to ${normalizedAction} vehicle.`);
 }
 
 async function loadVehiclesFromApi() {
