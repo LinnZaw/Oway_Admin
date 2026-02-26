@@ -9,10 +9,10 @@ const stats = [
 ];
 
 const liveTrips = [
-  { id: 'TR-5021', driver: 'Kamal Perera', vehicle: 'TW-4821', status: 'In Progress', eta: '08 min' },
-  { id: 'TR-5022', driver: 'Nuwan Silva', vehicle: 'TW-3094', status: 'Picking Up', eta: '03 min' },
-  { id: 'TR-5023', driver: 'Rizwan Ali', vehicle: 'TW-7740', status: 'Delayed', eta: '14 min' },
-  { id: 'TR-5024', driver: 'Sanjeewa Fernando', vehicle: 'TW-6252', status: 'In Progress', eta: '11 min' }
+  { id: 'TR-5021', distanceKm: 4.8, vehicle: 'TW-4821', status: 'In Progress', eta: '08 min' },
+  { id: 'TR-5022', distanceKm: 1.7, vehicle: 'TW-3094', status: 'Picking Up', eta: '03 min' },
+  { id: 'TR-5023', distanceKm: 9.4, vehicle: 'TW-7740', status: 'Delayed', eta: '14 min' },
+  { id: 'TR-5024', distanceKm: 6.1, vehicle: 'TW-6252', status: 'In Progress', eta: '11 min' }
 ];
 
 // ================================
@@ -24,6 +24,7 @@ const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
+const UPDATE_VEHICLE_API_URL = 'http://localhost:8000/api/admin';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 // ================================
@@ -171,7 +172,7 @@ function renderTrips() {
   body.innerHTML = liveTrips.map((trip) => `
     <tr>
       <td class="fw-semibold">${trip.id}</td>
-      <td>${trip.driver}</td>
+      <td><span class="rental-distance-cell">${Number(trip.distanceKm || 0).toFixed(1)} km</span></td>
       <td>${trip.vehicle}</td>
       <td><span class="badge status ${statusBadge(trip.status)}">${trip.status}</span></td>
       <td>${trip.eta}</td>
@@ -262,25 +263,43 @@ async function patchVehicleStatus(vehicleId, action) {
     throw new Error('Invalid vehicle action.');
   }
 
-  const response = await fetch(`http://localhost:8000/api/admin/vehicles/${vehicleId}/${normalizedAction}`, {
-    method: 'PATCH',
-    headers: getAuthHeaders()
+  const normalizedVehicleId = String(vehicleId || '').trim();
+
+  if (!normalizedVehicleId) {
+    throw new Error('Vehicle ID is missing.');
+  }
+
+  const requestUrl = `${UPDATE_VEHICLE_API_URL}/updateVehicle/${encodeURIComponent(normalizedVehicleId)}`;
+  const requestBody = JSON.stringify({
+    status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
   });
+
+  let apiResponse;
+
+  try {
+    apiResponse = await fetch(requestUrl, {
+      method: 'PATCH',
+      headers: getAuthHeaders(true),
+      body: requestBody
+    });
+  } catch {
+    throw new Error(`Unable to reach vehicle update API at ${requestUrl}. Check backend server/CORS settings.`);
+  }
 
   let responseBody = {};
 
   try {
-    responseBody = await response.json();
+    responseBody = await apiResponse.json();
   } catch {
     responseBody = {};
   }
 
-  if (response.status === 401 || response.status === 403) {
+  if (apiResponse.status === 401 || apiResponse.status === 403) {
     throw new Error('Session expired. Please log in again.');
   }
 
-  if (!response.ok) {
-    throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${response.status}`);
+  if (!apiResponse.ok) {
+    throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${apiResponse.status}`);
   }
 }
 
