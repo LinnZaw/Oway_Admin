@@ -458,6 +458,16 @@ function mapUser(rawUser) {
   };
 }
 
+function formatUserId(userId) {
+  const numericId = Number(userId);
+
+  if (!Number.isFinite(numericId)) {
+    return 'N/A';
+  }
+
+  return `UID-${String(Math.trunc(numericId)).padStart(3, '0')}`;
+}
+
 function getDisplayLocation(profile = {}) {
   const directLocation = profile.address || profile.locationName || profile.city || profile.location;
 
@@ -479,7 +489,7 @@ function renderUsers(users) {
   if (!users.length) {
     userTableBody.innerHTML = `
       <tr>
-        <td colspan="4" class="text-center text-muted py-4">No users found.</td>
+        <td colspan="5" class="text-center text-muted py-4">No users found.</td>
       </tr>
     `;
     return;
@@ -489,14 +499,12 @@ function renderUsers(users) {
     <tr>
       <td class="fw-semibold">${index + 1}</td>
       <td>${user.name}</td>
+      <td class="fw-semibold">${formatUserId(user.id)}</td>
       <td>${user.roles.length ? user.roles.join(', ') : '<span class="text-muted">No roles assigned</span>'}</td>
       <td>
         <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-gradient-primary btn-sm view-user-profile-btn" data-user-id="${user.id ?? ''}" data-user-name="${user.name}" data-user-email="${user.email}">
             <i class="bi bi-person-vcard me-1"></i>View Profile
-          </button>
-          <button class="btn btn-soft-secondary btn-sm copy-user-id-btn" data-user-id="${user.id ?? ''}">
-            <i class="bi bi-clipboard me-1"></i>Copy ID
           </button>
         </div>
       </td>
@@ -675,17 +683,6 @@ async function viewUserProfile(userId, userName, userEmail = '') {
   }
 }
 
-function copyUserId(userId) {
-  if (!userId) {
-    setUserNotice('warning', 'This user does not have a visible ID in API response.');
-    return;
-  }
-
-  navigator.clipboard.writeText(String(userId))
-    .then(() => setUserNotice('success', `User ID ${userId} copied to clipboard.`))
-    .catch(() => setUserNotice('warning', `Copy failed. User ID: ${userId}`));
-}
-
 // ================================
 // Roles
 // ================================
@@ -701,19 +698,30 @@ function mapRole(rawRole) {
   };
 }
 
+function formatRoleId(roleId) {
+  const numericId = Number(roleId);
+
+  if (!Number.isFinite(numericId)) {
+    return 'N/A';
+  }
+
+  return `RID-${String(Math.trunc(numericId)).padStart(3, '0')}`;
+}
+
 function renderRoles(roles) {
   if (!roles.length) {
     roleTableBody.innerHTML = `
       <tr>
-        <td colspan="2" class="text-center text-muted py-4">No roles found.</td>
+        <td colspan="3" class="text-center text-muted py-4">No roles found.</td>
       </tr>
     `;
     return;
   }
 
-  roleTableBody.innerHTML = roles.map((role) => `
+  roleTableBody.innerHTML = roles.map((role, index) => `
     <tr>
-      <td class="fw-semibold">${role.id}</td>
+      <td class="fw-semibold">${index + 1}</td>
+      <td class="fw-semibold">${formatRoleId(role.id)}</td>
       <td>${role.name}</td>
     </tr>
   `).join('');
@@ -1072,11 +1080,6 @@ userTableBody.addEventListener('click', (event) => {
     return;
   }
 
-  const copyButton = event.target.closest('.copy-user-id-btn');
-
-  if (copyButton) {
-    copyUserId(copyButton.dataset.userId || '');
-  }
 });
 
 vehicleTableBody.addEventListener('click', async (event) => {
