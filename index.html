@@ -47,6 +47,7 @@
           <li class="nav-item"><a id="usersNav" class="nav-link" href="#"><i class="bi bi-people"></i> Users</a></li>
           <li class="nav-item"><a id="rolesNav" class="nav-link" href="#"><i class="bi bi-person-badge"></i> Roles</a></li>
           <li class="nav-item"><a id="vehiclesNav" class="nav-link" href="#"><i class="bi bi-truck-front"></i> Vehicles</a></li>
+          <li class="nav-item"><a id="transactionsNav" class="nav-link" href="#"><i class="bi bi-receipt"></i> Transactions</a></li>
         </ul>
       </aside>
 
@@ -207,6 +208,54 @@
                   </tr>
                 </thead>
                 <tbody id="vehicleTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="transactionsPage" class="px-3 px-md-4 pb-4 d-none">
+          <div class="panel data-form-panel p-3 p-md-4 mb-4 transactions-panel">
+            <div class="mb-3">
+              <h3 class="h5 mb-1 fw-bold">Transaction Management</h3>
+              <p class="text-muted mb-0 small">Monitor wallet transactions and track their latest statuses.</p>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-12 col-md-6">
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-search"></i></span>
+                  <input id="transactionSearchInput" type="text" class="form-control" placeholder="Search by Transaction ID (TID-001) or Type" />
+                </div>
+              </div>
+              <div class="col-12 col-md-4 col-lg-3">
+                <select id="transactionStatusFilter" class="form-select">
+                  <option value="ALL">All Statuses</option>
+                  <option value="SUCCESS">SUCCESS</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="FAILED">FAILED</option>
+                  <option value="CANCELLED">CANCELLED</option>
+                  <option value="REVERSED">REVERSED</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="transactionApiNotice" class="alert alert-info py-2 px-3 small mb-3">
+              Open Transactions page to load data from API.
+            </div>
+
+            <div class="table-responsive transaction-table-scroll">
+              <table class="table align-middle">
+                <thead>
+                  <tr>
+                    <th style="width: 140px;">Transaction ID</th>
+                    <th style="width: 140px;">Amount</th>
+                    <th style="width: 130px;">Type</th>
+                    <th style="width: 160px;">Reference ID</th>
+                    <th style="width: 210px;">Date</th>
+                    <th style="width: 170px;">Transaction Status</th>
+                  </tr>
+                </thead>
+                <tbody id="transactionTableBody"></tbody>
               </table>
             </div>
           </div>

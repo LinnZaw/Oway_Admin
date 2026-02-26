@@ -7,6 +7,7 @@ const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
+const TRANSACTIONS_API_URL = 'http://localhost:8000/api/admin/getTransaction';
 const UPDATE_VEHICLE_API_URL = 'http://localhost:8000/api/admin';
 const RENTALS_API_URL = 'http://localhost:8000/api/admin/getRentals';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
@@ -25,6 +26,7 @@ const rentalNav = document.getElementById('rentalNav');
 const usersNav = document.getElementById('usersNav');
 const rolesNav = document.getElementById('rolesNav');
 const vehiclesNav = document.getElementById('vehiclesNav');
+const transactionsNav = document.getElementById('transactionsNav');
 const pageTitle = document.getElementById('pageTitle');
 const pageDescription = document.getElementById('pageDescription');
 const usersPage = document.getElementById('usersPage');
@@ -45,7 +47,11 @@ const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const vehiclesPage = document.getElementById('vehiclesPage');
 const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
-const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
+const transactionsPage = document.getElementById('transactionsPage');
+const transactionTableBody = document.getElementById('transactionTableBody');
+const transactionApiNotice = document.getElementById('transactionApiNotice');
+const transactionSearchInput = document.getElementById('transactionSearchInput');
+const transactionStatusFilter = document.getElementById('transactionStatusFilter');
 const rentalTableBody = document.getElementById('rentalTableBody');
 const rentalApiNotice = document.getElementById('rentalApiNotice');
 const rentalLoading = document.getElementById('rentalLoading');
@@ -54,6 +60,9 @@ let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
 let allVehicles = [];
+let allTransactions = [];
+let filteredTransactions = [];
+let roleLookupById = new Map();
 let allRentals = [];
 let roleLookupById = new Map();
 let rentalRelativeTimer = null;
@@ -504,6 +513,195 @@ async function loadVehiclesFromApi() {
 function setUserNotice(type, message) {
   userApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
   userApiNotice.textContent = message;
+}
+
+// ================================
+// Transactions
+// ================================
+function setTransactionNotice(type, message) {
+  transactionApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
+  transactionApiNotice.textContent = message;
+}
+
+function formatTransactionId(transactionId) {
+  const numericId = Number(transactionId);
+
+  if (!Number.isFinite(numericId)) {
+    return 'N/A';
+  }
+
+  return `TID-${String(Math.trunc(numericId)).padStart(3, '0')}`;
+}
+
+function formatAmount(amount) {
+  const numericAmount = Number(amount);
+  return Number.isFinite(numericAmount) ? numericAmount.toFixed(2) : '0.00';
+}
+
+function formatReferenceId(referenceId) {
+  const rawReference = String(referenceId || '').trim();
+
+  if (!rawReference) {
+    return 'N/A';
+  }
+
+  if (/^RefID-\d{3,}$/i.test(rawReference)) {
+    return rawReference;
+  }
+
+  if (/^\d+$/.test(rawReference)) {
+    return `RefID-${rawReference.padStart(3, '0')}`;
+  }
+
+  return rawReference;
+}
+
+function formatTransactionDate(createdAt) {
+  if (!createdAt) {
+    return 'N/A';
+  }
+
+  const parsedDate = new Date(createdAt);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return 'N/A';
+  }
+
+  return parsedDate.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function getTransactionTypeBadgeClass(type) {
+  switch (String(type || '').toUpperCase()) {
+    case 'DEPOSIT':
+      return 'bg-success-subtle text-success-emphasis border border-success-subtle';
+    case 'TOPUP':
+      return 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+    case 'TRANSFER':
+      return 'bg-primary-subtle text-primary-emphasis border border-primary-subtle';
+    default:
+      return 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle';
+  }
+}
+
+function getTransactionStatusBadgeClass(status) {
+  switch (String(status || '').toUpperCase()) {
+    case 'SUCCESS':
+      return 'bg-success-subtle text-success-emphasis border border-success-subtle';
+    case 'PENDING':
+      return 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+    case 'FAILED':
+      return 'bg-danger-subtle text-danger-emphasis border border-danger-subtle';
+    case 'CANCELLED':
+      return 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle';
+    case 'REVERSED':
+      return 'bg-primary-subtle text-primary-emphasis border border-primary-subtle';
+    default:
+      return 'bg-light text-dark border';
+  }
+}
+
+function mapTransaction(rawTransaction) {
+  return {
+    id: rawTransaction.id ?? rawTransaction.transactionId ?? null,
+    amount: rawTransaction.amount ?? 0,
+    type: (rawTransaction.type || 'N/A').toUpperCase(),
+    referenceId: rawTransaction.referenceId ?? rawTransaction.refId ?? '',
+    createdAt: rawTransaction.createdAt ?? rawTransaction.createdDate ?? rawTransaction.date,
+    transactionStatus: (rawTransaction.transactionStatus || rawTransaction.status || 'N/A').toUpperCase(),
+    raw: rawTransaction
+  };
+}
+
+function renderTransactions(transactions) {
+  if (!transactions.length) {
+    transactionTableBody.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center text-muted py-4">No transactions found.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  transactionTableBody.innerHTML = transactions.map((transaction) => `
+    <tr>
+      <td class="fw-semibold">${formatTransactionId(transaction.id)}</td>
+      <td>${formatAmount(transaction.amount)}</td>
+      <td>
+        <span class="badge rounded-pill fw-semibold ${getTransactionTypeBadgeClass(transaction.type)}">
+          ${transaction.type}
+        </span>
+      </td>
+      <td>${formatReferenceId(transaction.referenceId)}</td>
+      <td>${formatTransactionDate(transaction.createdAt)}</td>
+      <td>
+        <span class="badge rounded-pill fw-semibold ${getTransactionStatusBadgeClass(transaction.transactionStatus)}">
+          ${transaction.transactionStatus}
+        </span>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterTransactions() {
+  const query = transactionSearchInput.value.trim().toLowerCase();
+  const selectedStatus = transactionStatusFilter.value;
+
+  filteredTransactions = allTransactions.filter((transaction) => {
+    const transactionId = formatTransactionId(transaction.id).toLowerCase();
+    const type = String(transaction.type || '').toLowerCase();
+    const matchesSearch = !query || transactionId.includes(query) || type.includes(query);
+    const matchesStatus = selectedStatus === 'ALL' || transaction.transactionStatus === selectedStatus;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  renderTransactions(filteredTransactions);
+}
+
+async function loadTransactionsFromApi() {
+  let headers;
+
+  try {
+    headers = getAuthHeaders();
+  } catch (error) {
+    setTransactionNotice('warning', error.message);
+    return;
+  }
+
+  setTransactionNotice('info', `Loading transactions from ${TRANSACTIONS_API_URL} ...`);
+
+  try {
+    const response = await fetch(TRANSACTIONS_API_URL, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: Unable to load transactions.`);
+    }
+
+    const responseBody = await response.json();
+    const list = extractCollection(responseBody, ['transactions']);
+
+    allTransactions = list.map(mapTransaction);
+    filterTransactions();
+    setTransactionNotice('success', `Loaded ${allTransactions.length} transactions from API.`);
+  } catch (error) {
+    allTransactions = [];
+    filteredTransactions = [];
+    renderTransactions([]);
+    setTransactionNotice('danger', `Failed to load transactions from API. ${error.message}`);
+  }
 }
 
 function normalizeUserRoles(rawUser) {
@@ -971,10 +1169,12 @@ function showRentalPage() {
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
+  transactionsPage.classList.add('d-none');
   rentalNav.classList.add('active');
   usersNav.classList.remove('active');
   rolesNav.classList.remove('active');
   vehiclesNav.classList.remove('active');
+  transactionsNav.classList.remove('active');
   pageTitle.textContent = 'Rental Management';
   pageDescription.textContent = 'Track rentals, statuses, and timing from one place.';
   refreshBtn.classList.remove('d-none');
@@ -988,11 +1188,13 @@ function showUsersPage() {
   stopRentalRelativeTimeRefresh();
   rolesPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
+  transactionsPage.classList.add('d-none');
   usersPage.classList.remove('d-none');
   rentalNav.classList.remove('active');
   usersNav.classList.add('active');
   rolesNav.classList.remove('active');
   vehiclesNav.classList.remove('active');
+  transactionsNav.classList.remove('active');
   pageTitle.textContent = 'Users';
   pageDescription.textContent = 'Search users by name or role and open profiles.';
   refreshBtn.classList.add('d-none');
@@ -1020,11 +1222,13 @@ function showRolesPage() {
   stopRentalRelativeTimeRefresh();
   usersPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
+  transactionsPage.classList.add('d-none');
   rolesPage.classList.remove('d-none');
   rentalNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.add('active');
   vehiclesNav.classList.remove('active');
+  transactionsNav.classList.remove('active');
   pageTitle.textContent = 'Roles';
   pageDescription.textContent = 'Create and manage admin roles.';
   refreshBtn.classList.add('d-none');
@@ -1042,11 +1246,13 @@ function showVehiclesPage() {
   stopRentalRelativeTimeRefresh();
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
+  transactionsPage.classList.add('d-none');
   vehiclesPage.classList.remove('d-none');
   rentalNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.remove('active');
   vehiclesNav.classList.add('active');
+  transactionsNav.classList.remove('active');
   pageTitle.textContent = 'Vehicles';
   pageDescription.textContent = 'View and manage all registered vehicles.';
   refreshBtn.classList.add('d-none');
@@ -1058,6 +1264,30 @@ function showVehiclesPage() {
 function refreshRentals() {
   loadRentalsFromApi();
   refreshRentalRelativeTimes();
+}
+
+function showTransactionsPage() {
+  rentalPage.classList.add('d-none');
+  usersPage.classList.add('d-none');
+  rolesPage.classList.add('d-none');
+  vehiclesPage.classList.add('d-none');
+  transactionsPage.classList.remove('d-none');
+  rentalNav.classList.remove('active');
+  usersNav.classList.remove('active');
+  rolesNav.classList.remove('active');
+  vehiclesNav.classList.remove('active');
+  transactionsNav.classList.add('active');
+  pageTitle.textContent = 'Transaction Management';
+  pageDescription.textContent = 'Review deposits, topups, and transfers in one place.';
+  refreshBtn.classList.add('d-none');
+  window.location.hash = 'transactions';
+
+  if (!allTransactions.length) {
+    loadTransactionsFromApi();
+    return;
+  }
+
+  filterTransactions();
 }
 
 // ================================
@@ -1082,8 +1312,13 @@ function showApp() {
     return;
   }
 
-  if (window.location.hash === '#vehicles') {
-    showVehiclesPage();
+  if (window.location.hash === '#transactions') {
+    showTransactionsPage();
+    return;
+  }
+
+  if (window.location.hash === '#rentals') {
+    showRentalPage();
     return;
   }
 
@@ -1197,6 +1432,11 @@ vehiclesNav.addEventListener('click', (event) => {
   showVehiclesPage();
 });
 
+transactionsNav.addEventListener('click', (event) => {
+  event.preventDefault();
+  showTransactionsPage();
+});
+
 addRoleBtn.addEventListener('click', () => {
   setRoleFormVisible(true);
   roleNameInput.focus();
@@ -1238,6 +1478,9 @@ userTableBody.addEventListener('click', (event) => {
   }
 
 });
+
+transactionSearchInput.addEventListener('input', filterTransactions);
+transactionStatusFilter.addEventListener('change', filterTransactions);
 
 vehicleTableBody.addEventListener('click', async (event) => {
   const acceptButton = event.target.closest('.accept-vehicle-btn');

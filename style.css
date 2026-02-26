@@ -386,6 +386,54 @@ body {
   background: linear-gradient(180deg, rgba(100, 116, 139, 0.95), rgba(71, 85, 105, 0.95));
 }
 
+.transactions-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0 !important;
+  overflow: hidden;
+}
+
+.transaction-table-scroll {
+  flex: 1;
+  min-height: 0;
+  height: 420px;
+  overflow-y: auto;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.65) transparent;
+}
+
+.transaction-table-scroll .table {
+  margin-bottom: 0;
+}
+
+.transaction-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+.transaction-table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.transaction-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.transaction-table-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.8), rgba(100, 116, 139, 0.8));
+  border-radius: 999px;
+}
+
+.transaction-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(100, 116, 139, 0.95), rgba(71, 85, 105, 0.95));
+}
+
 
 .rental-table thead th {
   background: #fff8db;
@@ -430,6 +478,10 @@ body {
 
 @media (max-width: 768px) {
   .user-list-scroll {
+    height: 320px;
+  }
+
+  .transaction-table-scroll {
     height: 320px;
   }
 }
