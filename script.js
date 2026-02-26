@@ -36,8 +36,8 @@ const loginForm = document.getElementById('loginForm');
 const loginError = document.getElementById('loginError');
 const refreshBtn = document.getElementById('refreshBtn');
 const logoutBtn = document.getElementById('logoutBtn');
-const dashboardPage = document.getElementById('dashboardPage');
-const dashboardNav = document.getElementById('dashboardNav');
+const rentalPage = document.getElementById('rentalPage');
+const rentalNav = document.getElementById('rentalNav');
 const usersNav = document.getElementById('usersNav');
 const rolesNav = document.getElementById('rolesNav');
 const vehiclesNav = document.getElementById('vehiclesNav');
@@ -61,6 +61,8 @@ const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const vehiclesPage = document.getElementById('vehiclesPage');
 const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
+const rentalTableBody = document.getElementById('rentalTableBody');
+const rentalApiNotice = document.getElementById('rentalApiNotice');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
 let allUsers = [];
@@ -68,6 +70,8 @@ let allProfiles = [];
 let allRoles = [];
 let allVehicles = [];
 let roleLookupById = new Map();
+let allRentals = [];
+let rentalRelativeTimer = null;
 
 // ================================
 // Reusable utility helpers
@@ -140,30 +144,23 @@ function getAuthHeaders(includeJson = false) {
 }
 
 // ================================
-// Dashboard widgets
+// Rental management
 // ================================
-function renderStats() {
-  const statsGrid = document.getElementById('statsGrid');
-  statsGrid.innerHTML = stats.map((item) => `
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="panel stat-card p-3 bg-${item.tone}-subtle border-0">
-        <div class="label">${item.label}</div>
-        <div class="value">${item.value.toLocaleString()}</div>
-      </div>
-    </div>
-  `).join('');
+function setRentalNotice(type, message) {
+  rentalApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
+  rentalApiNotice.textContent = message;
 }
 
-function statusBadge(status) {
-  switch (status) {
-    case 'In Progress':
-      return 'bg-warning text-dark';
-    case 'Picking Up':
-      return 'bg-info text-dark';
-    case 'Delayed':
-      return 'bg-danger';
+function getRentalStatusBadgeClass(status) {
+  switch (String(status || '').toUpperCase()) {
+    case 'PENDING':
+      return 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+    case 'APPROVED':
+      return 'bg-success-subtle text-success-emphasis border border-success-subtle';
+    case 'REJECTED':
+      return 'bg-danger-subtle text-danger-emphasis border border-danger-subtle';
     default:
-      return 'bg-secondary';
+      return 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle';
   }
 }
 
@@ -291,7 +288,7 @@ async function patchVehicleStatus(vehicleId, action) {
   try {
     responseBody = await apiResponse.json();
   } catch {
-    responseBody = {};
+    throw new Error(`Unable to reach vehicle update API at ${patchUrl}. Check backend server/CORS settings.`);
   }
 
   if (apiResponse.status === 401 || apiResponse.status === 403) {
@@ -301,6 +298,8 @@ async function patchVehicleStatus(vehicleId, action) {
   if (!apiResponse.ok) {
     throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${apiResponse.status}`);
   }
+
+  throw new Error(lastError || `Failed to ${normalizedAction} vehicle.`);
 }
 
 async function loadVehiclesFromApi() {
@@ -768,15 +767,15 @@ async function loadRolesFromApi() {
   }
 }
 
-async function createRole(roleName) {
-  if (!roleName) {
+async function createRole(name) {
+  if (!name) {
     throw new Error('Role name is required.');
   }
 
   const response = await fetch(CREATE_ROLE_API_URL, {
     method: 'POST',
     headers: getAuthHeaders(true),
-    body: JSON.stringify({ roleName })
+    body: JSON.stringify({ name })
   });
 
   let responseBody = {};
@@ -797,27 +796,35 @@ async function createRole(roleName) {
 // ================================
 // Page-level navigation & actions
 // ================================
-function showDashboardPage() {
-  dashboardPage.classList.remove('d-none');
+function showRentalPage() {
+  rentalPage.classList.remove('d-none');
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
-  dashboardNav.classList.add('active');
+  rentalNav.classList.add('active');
   usersNav.classList.remove('active');
   rolesNav.classList.remove('active');
   vehiclesNav.classList.remove('active');
-  pageTitle.textContent = 'O_way Admin Overview';
-  pageDescription.textContent = 'Manage your yellow 3-wheeler ride network in one place.';
+  pageTitle.textContent = 'Rental Management';
+  pageDescription.textContent = 'Track all rental requests and statuses in real time.';
   refreshBtn.classList.remove('d-none');
-  window.location.hash = 'dashboard';
+  window.location.hash = 'rentals';
+
+  if (!allRentals.length) {
+    loadRentalsFromApi();
+  } else {
+    renderRentals(allRentals);
+    refreshRentalRelativeTimes();
+    startRentalRelativeTimeRefresh();
+  }
 }
 
 function showUsersPage() {
-  dashboardPage.classList.add('d-none');
+  rentalPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
   usersPage.classList.remove('d-none');
-  dashboardNav.classList.remove('active');
+  rentalNav.classList.remove('active');
   usersNav.classList.add('active');
   rolesNav.classList.remove('active');
   vehiclesNav.classList.remove('active');
@@ -844,11 +851,11 @@ function showUsersPage() {
 }
 
 function showRolesPage() {
-  dashboardPage.classList.add('d-none');
+  rentalPage.classList.add('d-none');
   usersPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
   rolesPage.classList.remove('d-none');
-  dashboardNav.classList.remove('active');
+  rentalNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.add('active');
   vehiclesNav.classList.remove('active');
@@ -865,11 +872,11 @@ function showRolesPage() {
 }
 
 function showVehiclesPage() {
-  dashboardPage.classList.add('d-none');
+  rentalPage.classList.add('d-none');
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   vehiclesPage.classList.remove('d-none');
-  dashboardNav.classList.remove('active');
+  rentalNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.remove('active');
   vehiclesNav.classList.add('active');
@@ -881,34 +888,16 @@ function showVehiclesPage() {
   loadVehiclesFromApi();
 }
 
-function sendAlert() {
-  alert('Fleet alert sent to all active 3-wheeler drivers.');
-}
-
-function assignVehicle() {
-  alert('Backup 3-wheeler has been assigned to pending high-priority trip.');
-}
-
-function downloadReport() {
-  alert('Daily operations report downloaded.');
-}
-
-function refreshDashboard() {
-  const randomIndex = Math.floor(Math.random() * liveTrips.length);
-  const eta = `${Math.floor(Math.random() * 12 + 2)} min`;
-  liveTrips[randomIndex].eta = eta;
-  renderTrips();
+function refreshRentals() {
+  loadRentalsFromApi();
 }
 
 // ================================
 // Auth flow
 // ================================
-function showDashboard() {
+function showApp() {
   loginView.classList.add('d-none');
   dashboardView.classList.remove('d-none');
-  renderStats();
-  renderTrips();
-
   if (window.location.hash === '#roles') {
     showRolesPage();
     return;
@@ -924,12 +913,22 @@ function showDashboard() {
     return;
   }
 
-  showDashboardPage();
+  if (window.location.hash === '#rentals') {
+    showRentalPage();
+    return;
+  }
+
+  showRentalPage();
 }
 
 function showLogin() {
   dashboardView.classList.add('d-none');
   loginView.classList.remove('d-none');
+
+  if (rentalRelativeTimer) {
+    clearInterval(rentalRelativeTimer);
+    rentalRelativeTimer = null;
+  }
 }
 
 function setLoginLoadingState(isLoading) {
@@ -999,7 +998,7 @@ loginForm.addEventListener('submit', async (event) => {
   try {
     await login(username, password);
     loginError.classList.add('d-none');
-    showDashboard();
+    showApp();
   } catch (error) {
     loginError.textContent = error.message;
     loginError.classList.remove('d-none');
@@ -1008,9 +1007,9 @@ loginForm.addEventListener('submit', async (event) => {
   }
 });
 
-dashboardNav.addEventListener('click', (event) => {
+rentalNav.addEventListener('click', (event) => {
   event.preventDefault();
-  showDashboardPage();
+  showRentalPage();
 });
 
 usersNav.addEventListener('click', (event) => {
@@ -1107,7 +1106,7 @@ vehicleTableBody.addEventListener('click', async (event) => {
   }
 });
 
-refreshBtn.addEventListener('click', refreshDashboard);
+refreshBtn.addEventListener('click', refreshRentals);
 logoutBtn.addEventListener('click', logout);
 
 
@@ -1115,11 +1114,8 @@ logoutBtn.addEventListener('click', logout);
 // App bootstrap
 // ================================
 if (getStoredToken()) {
-  showDashboard();
+  showApp();
 } else {
   showLogin();
 }
 
-window.sendAlert = sendAlert;
-window.assignVehicle = assignVehicle;
-window.downloadReport = downloadReport;
