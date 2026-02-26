@@ -263,16 +263,32 @@ async function patchVehicleStatus(vehicleId, action) {
     throw new Error('Invalid vehicle action.');
   }
 
+  const normalizedVehicleId = String(vehicleId || '').trim();
+
+  if (!normalizedVehicleId) {
+    throw new Error('Vehicle ID is missing.');
+  }
+
   // Backend expects path variable id and DTO body.
   const payload = {
-    vehicleStatus: normalizedAction === 'accept' ? 'ACCEPTED' : 'DECLINED'
+    status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
   };
 
-  const response = await fetch(`${UPDATE_VEHICLE_API_URL}/updateVehicle/${Number(vehicleId)}`, {
-    method: 'PATCH',
-    headers: getAuthHeaders(true),
-    body: JSON.stringify(payload)
-  });
+  const patchUrl = `${UPDATE_VEHICLE_API_URL}/updateVehicle/${encodeURIComponent(normalizedVehicleId)}`;
+
+  let response;
+
+  try {
+    const requestOptions = {
+      method: 'PATCH',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify(payload)
+    };
+
+    response = await fetch(patchUrl, requestOptions);
+  } catch {
+    throw new Error(`Unable to reach vehicle update API at ${patchUrl}. Check backend server/CORS settings.`);
+  }
 
   const candidateEndpoints = [
     UPDATE_VEHICLE_API_URL,
