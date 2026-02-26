@@ -1,21 +1,4 @@
 // ================================
-// Dashboard seed data (mock widgets)
-// ================================
-const stats = [
-  { label: 'Active Drivers', value: 142, tone: 'warning' },
-  { label: 'Online 3-Wheelers', value: 118, tone: 'light' },
-  { label: 'Completed Trips Today', value: 1864, tone: 'success' },
-  { label: 'Open Support Tickets', value: 23, tone: 'danger' }
-];
-
-const liveTrips = [
-  { id: 'TR-5021', driver: 'Kamal Perera', vehicle: 'TW-4821', status: 'In Progress', eta: '08 min' },
-  { id: 'TR-5022', driver: 'Nuwan Silva', vehicle: 'TW-3094', status: 'Picking Up', eta: '03 min' },
-  { id: 'TR-5023', driver: 'Rizwan Ali', vehicle: 'TW-7740', status: 'Delayed', eta: '14 min' },
-  { id: 'TR-5024', driver: 'Sanjeewa Fernando', vehicle: 'TW-6252', status: 'In Progress', eta: '11 min' }
-];
-
-// ================================
 // API endpoints and auth storage
 // ================================
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
@@ -25,6 +8,7 @@ const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
 const UPDATE_VEHICLE_API_URL = 'http://localhost:8000/api/admin';
+const RENTALS_API_URL = 'http://localhost:8000/api/admin/getRentals';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 // ================================
@@ -36,8 +20,8 @@ const loginForm = document.getElementById('loginForm');
 const loginError = document.getElementById('loginError');
 const refreshBtn = document.getElementById('refreshBtn');
 const logoutBtn = document.getElementById('logoutBtn');
-const dashboardPage = document.getElementById('dashboardPage');
-const dashboardNav = document.getElementById('dashboardNav');
+const rentalPage = document.getElementById('rentalPage');
+const rentalNav = document.getElementById('rentalNav');
 const usersNav = document.getElementById('usersNav');
 const rolesNav = document.getElementById('rolesNav');
 const vehiclesNav = document.getElementById('vehiclesNav');
@@ -61,6 +45,8 @@ const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const vehiclesPage = document.getElementById('vehiclesPage');
 const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
+const rentalTableBody = document.getElementById('rentalTableBody');
+const rentalApiNotice = document.getElementById('rentalApiNotice');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 
 let allUsers = [];
@@ -68,6 +54,8 @@ let allProfiles = [];
 let allRoles = [];
 let allVehicles = [];
 let roleLookupById = new Map();
+let allRentals = [];
+let rentalRelativeTimer = null;
 
 // ================================
 // Reusable utility helpers
@@ -140,44 +128,179 @@ function getAuthHeaders(includeJson = false) {
 }
 
 // ================================
-// Dashboard widgets
+// Rental management
 // ================================
-function renderStats() {
-  const statsGrid = document.getElementById('statsGrid');
-  statsGrid.innerHTML = stats.map((item) => `
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="panel stat-card p-3 bg-${item.tone}-subtle border-0">
-        <div class="label">${item.label}</div>
-        <div class="value">${item.value.toLocaleString()}</div>
-      </div>
-    </div>
-  `).join('');
+function setRentalNotice(type, message) {
+  rentalApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
+  rentalApiNotice.textContent = message;
 }
 
-function statusBadge(status) {
-  switch (status) {
-    case 'In Progress':
-      return 'bg-warning text-dark';
-    case 'Picking Up':
-      return 'bg-info text-dark';
-    case 'Delayed':
-      return 'bg-danger';
+function getRentalStatusBadgeClass(status) {
+  switch (String(status || '').toUpperCase()) {
+    case 'PENDING':
+      return 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+    case 'APPROVED':
+      return 'bg-success-subtle text-success-emphasis border border-success-subtle';
+    case 'REJECTED':
+      return 'bg-danger-subtle text-danger-emphasis border border-danger-subtle';
     default:
-      return 'bg-secondary';
+      return 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle';
   }
 }
 
-function renderTrips() {
-  const body = document.getElementById('tripTableBody');
-  body.innerHTML = liveTrips.map((trip) => `
-    <tr>
-      <td class="fw-semibold">${trip.id}</td>
-      <td>${trip.driver}</td>
-      <td>${trip.vehicle}</td>
-      <td><span class="badge status ${statusBadge(trip.status)}">${trip.status}</span></td>
-      <td>${trip.eta}</td>
-    </tr>
-  `).join('');
+function formatRelativeTime(isoTime) {
+  if (!isoTime) return 'N/A';
+  const date = new Date(isoTime);
+  if (Number.isNaN(date.getTime())) return 'Invalid date';
+
+  const diffSeconds = Math.round((Date.now() - date.getTime()) / 1000);
+  const absSeconds = Math.abs(diffSeconds);
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+  const units = [
+    ['day', 86400],
+    ['hour', 3600],
+    ['minute', 60],
+    ['second', 1]
+  ];
+
+  for (const [unit, size] of units) {
+    if (absSeconds >= size || unit === 'second') {
+      return rtf.format(-Math.round(diffSeconds / size), unit);
+    }
+  }
+
+  return 'just now';
+}
+
+function normalizeRental(rawRental) {
+  const rental = rawRental?.data && !Array.isArray(rawRental.data) && rawRental.id === undefined
+    ? rawRental.data
+    : rawRental;
+  return {
+    id: rental?.id ?? 'N/A',
+    vehicleId: rental?.vehicleId ?? null,
+    userId: rental?.userId ?? null,
+    rentalStatus: String(rental?.rentalStatus || 'UNKNOWN').toUpperCase(),
+    rentalTime: rental?.rentalTime || null
+  };
+}
+
+function extractRentals(responseBody) {
+  if (Array.isArray(responseBody)) return responseBody;
+
+  const candidates = [
+    responseBody?.data,
+    responseBody?.result,
+    responseBody?.items,
+    responseBody?.records
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+    if (candidate && typeof candidate === 'object' && (candidate.id !== undefined || candidate.rentalStatus !== undefined)) {
+      return [candidate];
+    }
+  }
+
+  if (responseBody && typeof responseBody === 'object' && (responseBody.id !== undefined || responseBody.rentalStatus !== undefined)) {
+    return [responseBody];
+  }
+
+  return [];
+}
+
+function resolveRentalPresentation(rental) {
+  const matchingVehicle = allVehicles.find((vehicle) => String(vehicle.id) === String(rental.vehicleId));
+  const matchingUser = allUsers.find((user) => String(user.id) === String(rental.userId));
+
+  return {
+    driver: matchingVehicle?.ownerName || `Driver #${rental.vehicleId ?? 'N/A'}`,
+    vehicleNo: matchingVehicle?.plateNumber || `Vehicle #${rental.vehicleId ?? 'N/A'}`,
+    customer: matchingUser?.name || `Customer #${rental.userId ?? 'N/A'}`
+  };
+}
+
+function renderRentals(rentals) {
+  if (!rentals.length) {
+    rentalTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No rentals found.</td></tr>';
+    return;
+  }
+
+  rentalTableBody.innerHTML = rentals.map((rental) => {
+    const info = resolveRentalPresentation(rental);
+    return `
+      <tr>
+        <td class="fw-semibold">${rental.id}</td>
+        <td>${info.driver}</td>
+        <td>${info.vehicleNo}</td>
+        <td>${info.customer}</td>
+        <td><span class="badge rounded-pill fw-semibold ${getRentalStatusBadgeClass(rental.rentalStatus)}">${rental.rentalStatus}</span></td>
+        <td data-rental-time="${rental.rentalTime || ''}" class="rental-time-cell">${formatRelativeTime(rental.rentalTime)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function refreshRentalRelativeTimes() {
+  const timeCells = rentalTableBody.querySelectorAll('.rental-time-cell');
+  timeCells.forEach((cell) => {
+    cell.textContent = formatRelativeTime(cell.dataset.rentalTime);
+  });
+}
+
+function startRentalRelativeTimeRefresh() {
+  if (rentalRelativeTimer) clearInterval(rentalRelativeTimer);
+  rentalRelativeTimer = setInterval(refreshRentalRelativeTimes, 30000);
+}
+
+async function loadRentalsFromApi() {
+  try {
+    getAuthHeaders();
+  } catch (error) {
+    setRentalNotice('warning', error.message);
+    showLogin();
+    return;
+  }
+
+  setRentalNotice('info', `Loading rentals from ${RENTALS_API_URL} ...`);
+
+  try {
+    const [usersResult, vehiclesResult] = await Promise.allSettled([
+      fetch(USERS_API_URL, { headers: getAuthHeaders() }),
+      fetch(VEHICLES_API_URL, { headers: getAuthHeaders() })
+    ]);
+
+    if (usersResult.status === 'fulfilled' && usersResult.value.ok) {
+      const userBody = await usersResult.value.json();
+      allUsers = extractCollection(userBody, ['users']).map(mapUser);
+    }
+
+    if (vehiclesResult.status === 'fulfilled' && vehiclesResult.value.ok) {
+      const vehicleBody = await vehiclesResult.value.json();
+      allVehicles = extractCollection(vehicleBody, ['vehicles']).map(mapVehicle);
+    }
+
+    const response = await fetch(RENTALS_API_URL, { headers: getAuthHeaders() });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`API failed with status ${response.status}`);
+    }
+
+    const responseBody = await response.json();
+    allRentals = extractRentals(responseBody).map(normalizeRental);
+    renderRentals(allRentals);
+    startRentalRelativeTimeRefresh();
+    setRentalNotice('success', `Loaded ${allRentals.length} rental record(s) from API.`);
+  } catch (error) {
+    allRentals = [];
+    renderRentals([]);
+    setRentalNotice('danger', `Failed to load rentals from API. ${error.message}`);
+  }
 }
 
 // ================================
@@ -825,27 +948,35 @@ async function createRole(name) {
 // ================================
 // Page-level navigation & actions
 // ================================
-function showDashboardPage() {
-  dashboardPage.classList.remove('d-none');
+function showRentalPage() {
+  rentalPage.classList.remove('d-none');
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
-  dashboardNav.classList.add('active');
+  rentalNav.classList.add('active');
   usersNav.classList.remove('active');
   rolesNav.classList.remove('active');
   vehiclesNav.classList.remove('active');
-  pageTitle.textContent = 'O_way Admin Overview';
-  pageDescription.textContent = 'Manage your yellow 3-wheeler ride network in one place.';
+  pageTitle.textContent = 'Rental Management';
+  pageDescription.textContent = 'Track all rental requests and statuses in real time.';
   refreshBtn.classList.remove('d-none');
-  window.location.hash = 'dashboard';
+  window.location.hash = 'rentals';
+
+  if (!allRentals.length) {
+    loadRentalsFromApi();
+  } else {
+    renderRentals(allRentals);
+    refreshRentalRelativeTimes();
+    startRentalRelativeTimeRefresh();
+  }
 }
 
 function showUsersPage() {
-  dashboardPage.classList.add('d-none');
+  rentalPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
   usersPage.classList.remove('d-none');
-  dashboardNav.classList.remove('active');
+  rentalNav.classList.remove('active');
   usersNav.classList.add('active');
   rolesNav.classList.remove('active');
   vehiclesNav.classList.remove('active');
@@ -872,11 +1003,11 @@ function showUsersPage() {
 }
 
 function showRolesPage() {
-  dashboardPage.classList.add('d-none');
+  rentalPage.classList.add('d-none');
   usersPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
   rolesPage.classList.remove('d-none');
-  dashboardNav.classList.remove('active');
+  rentalNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.add('active');
   vehiclesNav.classList.remove('active');
@@ -893,11 +1024,11 @@ function showRolesPage() {
 }
 
 function showVehiclesPage() {
-  dashboardPage.classList.add('d-none');
+  rentalPage.classList.add('d-none');
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   vehiclesPage.classList.remove('d-none');
-  dashboardNav.classList.remove('active');
+  rentalNav.classList.remove('active');
   usersNav.classList.remove('active');
   rolesNav.classList.remove('active');
   vehiclesNav.classList.add('active');
@@ -909,34 +1040,16 @@ function showVehiclesPage() {
   loadVehiclesFromApi();
 }
 
-function sendAlert() {
-  alert('Fleet alert sent to all active 3-wheeler drivers.');
-}
-
-function assignVehicle() {
-  alert('Backup 3-wheeler has been assigned to pending high-priority trip.');
-}
-
-function downloadReport() {
-  alert('Daily operations report downloaded.');
-}
-
-function refreshDashboard() {
-  const randomIndex = Math.floor(Math.random() * liveTrips.length);
-  const eta = `${Math.floor(Math.random() * 12 + 2)} min`;
-  liveTrips[randomIndex].eta = eta;
-  renderTrips();
+function refreshRentals() {
+  loadRentalsFromApi();
 }
 
 // ================================
 // Auth flow
 // ================================
-function showDashboard() {
+function showApp() {
   loginView.classList.add('d-none');
   dashboardView.classList.remove('d-none');
-  renderStats();
-  renderTrips();
-
   if (window.location.hash === '#roles') {
     showRolesPage();
     return;
@@ -952,12 +1065,22 @@ function showDashboard() {
     return;
   }
 
-  showDashboardPage();
+  if (window.location.hash === '#rentals') {
+    showRentalPage();
+    return;
+  }
+
+  showRentalPage();
 }
 
 function showLogin() {
   dashboardView.classList.add('d-none');
   loginView.classList.remove('d-none');
+
+  if (rentalRelativeTimer) {
+    clearInterval(rentalRelativeTimer);
+    rentalRelativeTimer = null;
+  }
 }
 
 function setLoginLoadingState(isLoading) {
@@ -1027,7 +1150,7 @@ loginForm.addEventListener('submit', async (event) => {
   try {
     await login(username, password);
     loginError.classList.add('d-none');
-    showDashboard();
+    showApp();
   } catch (error) {
     loginError.textContent = error.message;
     loginError.classList.remove('d-none');
@@ -1036,9 +1159,9 @@ loginForm.addEventListener('submit', async (event) => {
   }
 });
 
-dashboardNav.addEventListener('click', (event) => {
+rentalNav.addEventListener('click', (event) => {
   event.preventDefault();
-  showDashboardPage();
+  showRentalPage();
 });
 
 usersNav.addEventListener('click', (event) => {
@@ -1135,7 +1258,7 @@ vehicleTableBody.addEventListener('click', async (event) => {
   }
 });
 
-refreshBtn.addEventListener('click', refreshDashboard);
+refreshBtn.addEventListener('click', refreshRentals);
 logoutBtn.addEventListener('click', logout);
 
 
@@ -1143,11 +1266,8 @@ logoutBtn.addEventListener('click', logout);
 // App bootstrap
 // ================================
 if (getStoredToken()) {
-  showDashboard();
+  showApp();
 } else {
   showLogin();
 }
 
-window.sendAlert = sendAlert;
-window.assignVehicle = assignVehicle;
-window.downloadReport = downloadReport;
