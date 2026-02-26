@@ -301,10 +301,19 @@ body {
 .user-list-scroll {
   flex: 1;
   min-height: 0;
+  height: 420px;
   margin-bottom: 0 !important;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(100, 116, 139, 0.65) transparent;
+}
+
+.user-list-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
 }
 
 .user-list-scroll::-webkit-scrollbar {
@@ -416,4 +425,11 @@ body {
   color: #664d03;
   font-weight: 600;
   font-size: 0.85rem;
+}
+
+
+@media (max-width: 768px) {
+  .user-list-scroll {
+    height: 320px;
+  }
 }
