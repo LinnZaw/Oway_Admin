@@ -70,43 +70,23 @@
             </div>
 
           <div class="row g-3">
-            <div class="col-lg-8">
+            <div class="col-12">
               <div class="panel p-3 p-md-4 h-100">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h3 class="h5 mb-0 fw-bold">Live Trip Queue</h3>
-                  <span class="badge bg-warning text-dark">Real-time</span>
+                <h3 class="h5 mb-3 fw-bold">Operational Actions</h3>
+                <div class="d-grid gap-2">
+                  <button class="btn btn-dark fw-semibold" onclick="sendAlert()">Send Fleet Alert</button>
+                  <button class="btn btn-outline-primary" onclick="assignVehicle()">Assign Backup Vehicle</button>
+                  <button class="btn btn-outline-success" onclick="downloadReport()">Download Daily Report</button>
                 </div>
-                <div class="table-responsive">
-                  <table class="table align-middle rental-trip-table">
-                    <thead>
-                      <tr>
-                        <th>Ride ID</th>
-                        <th>Distance (km)</th>
-                        <th>Vehicle No.</th>
-                        <th>Status</th>
-                        <th>ETA</th>
-                      </tr>
-                    </thead>
-                    <tbody id="tripTableBody"></tbody>
-                  </table>
-                </div>
+                <hr>
+                <h4 class="h6 fw-bold">Coverage Zones</h4>
+                <ul class="small text-muted mb-0">
+                  <li>City Center - High Demand</li>
+                  <li>Market Route - Medium Demand</li>
+                  <li>Campus Route - High Demand</li>
+                  <li>Airport Link - Low Demand</li>
+                </ul>
               </div>
-            </div>
-
-            <div class="table-responsive rental-table-scroll">
-              <table class="table align-middle">
-                <thead>
-                  <tr>
-                    <th>Ride ID</th>
-                    <th>Driver</th>
-                    <th>Vehicle No.</th>
-                    <th>Customer</th>
-                    <th>Rental Status</th>
-                    <th>Rented Time</th>
-                  </tr>
-                </thead>
-                <tbody id="rentalTableBody"></tbody>
-              </table>
             </div>
           </div>
         </section>

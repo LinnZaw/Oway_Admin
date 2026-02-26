@@ -166,6 +166,11 @@ function getRentalStatusBadgeClass(status) {
 
 function renderTrips() {
   const body = document.getElementById('tripTableBody');
+
+  if (!body) {
+    return;
+  }
+
   body.innerHTML = liveTrips.map((trip) => `
     <tr>
       <td class="fw-semibold">${trip.id}</td>
@@ -268,7 +273,7 @@ async function patchVehicleStatus(vehicleId, action) {
 
   const requestUrl = `${UPDATE_VEHICLE_API_URL}/updateVehicle/${encodeURIComponent(normalizedVehicleId)}`;
   const requestBody = JSON.stringify({
-    vehicleStatus: normalizedAction === 'accept' ? 'ACCEPTED' : 'DECLINED'
+    status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
   });
 
   let apiResponse;
