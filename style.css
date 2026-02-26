@@ -435,13 +435,30 @@ body {
 }
 
 
-.rental-trip-table thead th {
+.rental-table thead th {
   background: #fff8db;
   color: #7c5a00;
 }
 
-.rental-trip-table tbody tr:hover {
+.rental-table tbody tr:hover {
   background: #fffbeb;
+}
+
+.rental-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.rental-table-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - 290px);
+  overflow: auto;
+}
+
+.rental-table {
+  margin-bottom: 0;
 }
 
 .rental-distance-cell {

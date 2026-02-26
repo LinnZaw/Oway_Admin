@@ -1,21 +1,4 @@
 // ================================
-// Dashboard seed data (mock widgets)
-// ================================
-const stats = [
-  { label: 'Active Drivers', value: 142, tone: 'warning' },
-  { label: 'Online 3-Wheelers', value: 118, tone: 'light' },
-  { label: 'Completed Trips Today', value: 1864, tone: 'success' },
-  { label: 'Open Support Tickets', value: 23, tone: 'danger' }
-];
-
-const liveTrips = [
-  { id: 'TR-5021', distanceKm: 4.8, vehicle: 'TW-4821', status: 'In Progress', eta: '08 min' },
-  { id: 'TR-5022', distanceKm: 1.7, vehicle: 'TW-3094', status: 'Picking Up', eta: '03 min' },
-  { id: 'TR-5023', distanceKm: 9.4, vehicle: 'TW-7740', status: 'Delayed', eta: '14 min' },
-  { id: 'TR-5024', distanceKm: 6.1, vehicle: 'TW-6252', status: 'In Progress', eta: '11 min' }
-];
-
-// ================================
 // API endpoints and auth storage
 // ================================
 const LOGIN_API_URL = 'http://localhost:8000/api/auth/login';
@@ -26,6 +9,7 @@ const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
 const TRANSACTIONS_API_URL = 'http://localhost:8000/api/admin/getTransaction';
 const UPDATE_VEHICLE_API_URL = 'http://localhost:8000/api/admin';
+const RENTALS_API_URL = 'http://localhost:8000/api/admin/getRentals';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 // ================================
@@ -70,7 +54,7 @@ const transactionSearchInput = document.getElementById('transactionSearchInput')
 const transactionStatusFilter = document.getElementById('transactionStatusFilter');
 const rentalTableBody = document.getElementById('rentalTableBody');
 const rentalApiNotice = document.getElementById('rentalApiNotice');
-const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
+const rentalLoading = document.getElementById('rentalLoading');
 
 let allUsers = [];
 let allProfiles = [];
@@ -80,6 +64,7 @@ let allTransactions = [];
 let filteredTransactions = [];
 let roleLookupById = new Map();
 let allRentals = [];
+let roleLookupById = new Map();
 let rentalRelativeTimer = null;
 
 // ================================
@@ -152,12 +137,59 @@ function getAuthHeaders(includeJson = false) {
   };
 }
 
-// ================================
-// Rental management
-// ================================
 function setRentalNotice(type, message) {
   rentalApiNotice.className = `alert alert-${type} py-2 px-3 small mb-3`;
   rentalApiNotice.textContent = message;
+}
+
+function setRentalLoading(isLoading) {
+  rentalLoading.classList.toggle('d-none', !isLoading);
+}
+
+function mapRental(rawRental) {
+  return {
+    id: rawRental.id ?? 'N/A',
+    customerId: rawRental.customerId ?? null,
+    driverId: rawRental.driverId ?? null,
+
+    driverName:
+      rawRental.vehicle?.user?.profile?.fullName ||
+      rawRental.vehicle?.user?.name ||
+      'N/A',
+
+    plateNumber:
+      rawRental.vehicle?.plateNumber || 'N/A',
+
+    distance: rawRental.distance ?? 0,
+    rentalStatus: String(rawRental.rentalStatus || 'UNKNOWN').toUpperCase(),
+    rentalTime: rawRental.rentalTime || null
+  };
+}
+
+function formatCustomerId(customerId) {
+  const numericId = Number(customerId);
+
+  if (!Number.isFinite(numericId)) {
+    return 'N/A';
+  }
+
+  return `CID-${String(Math.trunc(numericId)).padStart(3, '0')}`;
+}
+
+function normalizeRentalCollection(responseBody) {
+  if (Array.isArray(responseBody)) {
+    return responseBody;
+  }
+
+  if (Array.isArray(responseBody?.data)) {
+    return responseBody.data;
+  }
+
+  if (responseBody?.data && typeof responseBody.data === 'object') {
+    return [responseBody.data];
+  }
+
+  return extractCollection(responseBody, ['rentals']);
 }
 
 function getRentalStatusBadgeClass(status) {
@@ -173,22 +205,144 @@ function getRentalStatusBadgeClass(status) {
   }
 }
 
-function renderTrips() {
-  const body = document.getElementById('tripTableBody');
+function formatRelativeTime(isoDateString) {
+  if (!isoDateString) {
+    return 'N/A';
+  }
 
-  if (!body) {
+  const target = new Date(isoDateString);
+
+  if (Number.isNaN(target.getTime())) {
+    return 'Invalid time';
+  }
+
+  const diffSeconds = Math.floor((Date.now() - target.getTime()) / 1000);
+  const absoluteSeconds = Math.abs(diffSeconds);
+
+  if (absoluteSeconds < 60) {
+    return diffSeconds >= 0 ? 'just now' : 'in a few seconds';
+  }
+
+  const units = [
+    { label: 'year', value: 31536000 },
+    { label: 'month', value: 2592000 },
+    { label: 'day', value: 86400 },
+    { label: 'hour', value: 3600 },
+    { label: 'min', value: 60 }
+  ];
+
+  for (const unit of units) {
+    if (absoluteSeconds >= unit.value) {
+      const amount = Math.floor(absoluteSeconds / unit.value);
+      const suffix = amount > 1 ? 's' : '';
+      return diffSeconds >= 0
+        ? `${amount} ${unit.label}${suffix} ago`
+        : `in ${amount} ${unit.label}${suffix}`;
+    }
+  }
+
+  return 'just now';
+}
+
+function getDriverLabel(vehicleId) {
+  if (vehicleId === null || vehicleId === undefined || vehicleId === '') {
+    return 'Unassigned';
+  }
+
+  return `Driver #${vehicleId}`;
+}
+
+function getVehicleNoLabel(vehicleId) {
+  if (vehicleId === null || vehicleId === undefined || vehicleId === '') {
+    return 'N/A';
+  }
+
+  return `VH-${String(vehicleId).padStart(4, '0')}`;
+}
+
+function renderRentals() {
+  if (!allRentals.length) {
+    rentalTableBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center text-muted py-4">No rentals found.</td>
+      </tr>
+    `;
     return;
   }
 
-  body.innerHTML = liveTrips.map((trip) => `
+  rentalTableBody.innerHTML = allRentals.map((rental) => `
     <tr>
-      <td class="fw-semibold">${trip.id}</td>
-      <td><span class="rental-distance-cell">${Number(trip.distanceKm || 0).toFixed(1)} km</span></td>
-      <td>${trip.vehicle}</td>
-      <td><span class="badge status ${statusBadge(trip.status)}">${trip.status}</span></td>
-      <td>${trip.eta}</td>
+      <td class="fw-semibold">${rental.id}</td>
+      <td>${rental.driverName}</td>
+      <td>${rental.plateNumber}</td>
+      <td>${formatCustomerId(rental.customerId)}</td>
+      <td><span class="rental-distance-cell">${Number(rental.distance || 0).toFixed(1)} km</span></td>
+      <td>
+        <span class="badge rounded-pill fw-semibold ${getRentalStatusBadgeClass(rental.rentalStatus)}">
+          ${rental.rentalStatus}
+        </span>
+      </td>
+      <td data-rental-time="${rental.rentalTime || ''}">${formatRelativeTime(rental.rentalTime)}</td>
     </tr>
   `).join('');
+}
+
+function refreshRentalRelativeTimes() {
+  const relativeCells = rentalTableBody.querySelectorAll('[data-rental-time]');
+  relativeCells.forEach((cell) => {
+    cell.textContent = formatRelativeTime(cell.dataset.rentalTime || '');
+  });
+}
+
+function startRentalRelativeTimeRefresh() {
+  stopRentalRelativeTimeRefresh();
+  rentalRelativeTimer = setInterval(refreshRentalRelativeTimes, 30000);
+}
+
+function stopRentalRelativeTimeRefresh() {
+  if (rentalRelativeTimer) {
+    clearInterval(rentalRelativeTimer);
+    rentalRelativeTimer = null;
+  }
+}
+
+async function loadRentalsFromApi() {
+  try {
+    getAuthHeaders();
+  } catch (error) {
+    setRentalNotice('warning', error.message);
+    showLogin();
+    return;
+  }
+
+  setRentalLoading(true);
+  setRentalNotice('info', `Loading rentals from ${RENTALS_API_URL} ...`);
+
+  try {
+    const response = await fetch(RENTALS_API_URL, {
+      headers: getAuthHeaders()
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`API failed with status ${response.status}`);
+    }
+
+    const responseBody = await response.json();
+    allRentals = normalizeRentalCollection(responseBody).map(mapRental);
+    renderRentals();
+    refreshRentalRelativeTimes();
+    setRentalNotice('success', `Loaded ${allRentals.length} rentals from API.`);
+  } catch (error) {
+    allRentals = [];
+    renderRentals();
+    setRentalNotice('danger', `Failed to load rentals from API. ${error.message}`);
+  } finally {
+    setRentalLoading(false);
+  }
 }
 
 // ================================
@@ -281,8 +435,9 @@ async function patchVehicleStatus(vehicleId, action) {
   }
 
   const requestUrl = `${UPDATE_VEHICLE_API_URL}/updateVehicle/${encodeURIComponent(normalizedVehicleId)}`;
+
   const requestBody = JSON.stringify({
-    status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
+    vehicleStatus: normalizedAction === 'accept' ? 'ACCEPTED' : 'DECLINED'
   });
 
   let apiResponse;
@@ -302,7 +457,7 @@ async function patchVehicleStatus(vehicleId, action) {
   try {
     responseBody = await apiResponse.json();
   } catch {
-    throw new Error(`Unable to reach vehicle update API at ${patchUrl}. Check backend server/CORS settings.`);
+    responseBody = {};
   }
 
   if (apiResponse.status === 401 || apiResponse.status === 403) {
@@ -310,10 +465,12 @@ async function patchVehicleStatus(vehicleId, action) {
   }
 
   if (!apiResponse.ok) {
-    throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${apiResponse.status}`);
+    throw new Error(
+      responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${apiResponse.status}`
+    );
   }
 
-  throw new Error(lastError || `Failed to ${normalizedAction} vehicle.`);
+  return responseBody;
 }
 
 async function loadVehiclesFromApi() {
@@ -1019,21 +1176,16 @@ function showRentalPage() {
   vehiclesNav.classList.remove('active');
   transactionsNav.classList.remove('active');
   pageTitle.textContent = 'Rental Management';
-  pageDescription.textContent = 'Track all rental requests and statuses in real time.';
+  pageDescription.textContent = 'Track rentals, statuses, and timing from one place.';
   refreshBtn.classList.remove('d-none');
   window.location.hash = 'rentals';
-
-  if (!allRentals.length) {
-    loadRentalsFromApi();
-  } else {
-    renderRentals(allRentals);
-    refreshRentalRelativeTimes();
-    startRentalRelativeTimeRefresh();
-  }
+  loadRentalsFromApi();
+  startRentalRelativeTimeRefresh();
 }
 
 function showUsersPage() {
   rentalPage.classList.add('d-none');
+  stopRentalRelativeTimeRefresh();
   rolesPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
   transactionsPage.classList.add('d-none');
@@ -1067,6 +1219,7 @@ function showUsersPage() {
 
 function showRolesPage() {
   rentalPage.classList.add('d-none');
+  stopRentalRelativeTimeRefresh();
   usersPage.classList.add('d-none');
   vehiclesPage.classList.add('d-none');
   transactionsPage.classList.add('d-none');
@@ -1090,6 +1243,7 @@ function showRolesPage() {
 
 function showVehiclesPage() {
   rentalPage.classList.add('d-none');
+  stopRentalRelativeTimeRefresh();
   usersPage.classList.add('d-none');
   rolesPage.classList.add('d-none');
   transactionsPage.classList.add('d-none');
@@ -1109,6 +1263,7 @@ function showVehiclesPage() {
 
 function refreshRentals() {
   loadRentalsFromApi();
+  refreshRentalRelativeTimes();
 }
 
 function showTransactionsPage() {
@@ -1141,6 +1296,7 @@ function showTransactionsPage() {
 function showApp() {
   loginView.classList.add('d-none');
   dashboardView.classList.remove('d-none');
+
   if (window.location.hash === '#roles') {
     showRolesPage();
     return;
@@ -1151,8 +1307,8 @@ function showApp() {
     return;
   }
 
-  if (window.location.hash === '#vehicles') {
-    showVehiclesPage();
+  if (window.location.hash === '#rentals') {
+    showRentalPage();
     return;
   }
 
@@ -1220,6 +1376,7 @@ async function login(name, password) {
 }
 
 function logout() {
+  stopRentalRelativeTimeRefresh();
   clearStoredToken();
   showLogin();
   loginForm.reset();
