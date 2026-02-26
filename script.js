@@ -45,6 +45,8 @@ const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const vehiclesPage = document.getElementById('vehiclesPage');
 const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
+const rentalTableBody = document.getElementById('rentalTableBody');
+const rentalApiNotice = document.getElementById('rentalApiNotice');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 const rentalTableBody = document.getElementById('rentalTableBody');
 const rentalApiNotice = document.getElementById('rentalApiNotice');
@@ -428,7 +430,7 @@ async function patchVehicleStatus(vehicleId, action) {
   try {
     responseBody = await apiResponse.json();
   } catch {
-    responseBody = {};
+    throw new Error(`Unable to reach vehicle update API at ${patchUrl}. Check backend server/CORS settings.`);
   }
 
   if (apiResponse.status === 401 || apiResponse.status === 403) {
@@ -438,6 +440,8 @@ async function patchVehicleStatus(vehicleId, action) {
   if (!apiResponse.ok) {
     throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${apiResponse.status}`);
   }
+
+  throw new Error(lastError || `Failed to ${normalizedAction} vehicle.`);
 }
 
 async function loadVehiclesFromApi() {
@@ -905,15 +909,15 @@ async function loadRolesFromApi() {
   }
 }
 
-async function createRole(roleName) {
-  if (!roleName) {
+async function createRole(name) {
+  if (!name) {
     throw new Error('Role name is required.');
   }
 
   const response = await fetch(CREATE_ROLE_API_URL, {
     method: 'POST',
     headers: getAuthHeaders(true),
-    body: JSON.stringify({ roleName })
+    body: JSON.stringify({ name })
   });
 
   let responseBody = {};
@@ -1031,7 +1035,7 @@ function refreshRentals() {
 // ================================
 // Auth flow
 // ================================
-function showDashboard() {
+function showApp() {
   loginView.classList.add('d-none');
   dashboardView.classList.remove('d-none');
 
@@ -1061,6 +1065,11 @@ function showDashboard() {
 function showLogin() {
   dashboardView.classList.add('d-none');
   loginView.classList.remove('d-none');
+
+  if (rentalRelativeTimer) {
+    clearInterval(rentalRelativeTimer);
+    rentalRelativeTimer = null;
+  }
 }
 
 function setLoginLoadingState(isLoading) {
@@ -1131,7 +1140,7 @@ loginForm.addEventListener('submit', async (event) => {
   try {
     await login(username, password);
     loginError.classList.add('d-none');
-    showDashboard();
+    showApp();
   } catch (error) {
     loginError.textContent = error.message;
     loginError.classList.remove('d-none');
@@ -1247,7 +1256,7 @@ logoutBtn.addEventListener('click', logout);
 // App bootstrap
 // ================================
 if (getStoredToken()) {
-  showDashboard();
+  showApp();
 } else {
   showLogin();
 }
