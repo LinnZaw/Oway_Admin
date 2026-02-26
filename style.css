@@ -376,3 +376,27 @@ body {
 .vehicle-table-scroll::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, rgba(100, 116, 139, 0.95), rgba(71, 85, 105, 0.95));
 }
+
+
+.rentals-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0 !important;
+  overflow: hidden;
+}
+
+.rental-table-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - 290px);
+  overflow: auto;
+  margin-bottom: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.65) transparent;
+}
+
+.rental-table-scroll .table {
+  margin-bottom: 0;
+}
