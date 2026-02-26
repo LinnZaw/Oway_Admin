@@ -266,88 +266,37 @@ async function patchVehicleStatus(vehicleId, action) {
     throw new Error('Vehicle ID is missing.');
   }
 
-  // Backend expects path variable id and DTO body.
-  const payload = {
+  const requestUrl = `${UPDATE_VEHICLE_API_URL}/updateVehicle/${encodeURIComponent(normalizedVehicleId)}`;
+  const requestBody = JSON.stringify({
     status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
-  };
+  });
 
-  const patchUrl = `${UPDATE_VEHICLE_API_URL}/updateVehicle/${encodeURIComponent(normalizedVehicleId)}`;
-
-  let response;
+  let apiResponse;
 
   try {
-    const requestOptions = {
+    apiResponse = await fetch(requestUrl, {
       method: 'PATCH',
       headers: getAuthHeaders(true),
-      body: JSON.stringify(payload)
-    };
-
-    response = await fetch(patchUrl, requestOptions);
-  } catch {
-    throw new Error(`Unable to reach vehicle update API at ${patchUrl}. Check backend server/CORS settings.`);
-  }
-
-  if (!normalizedVehicleId) {
-    throw new Error('Vehicle ID is missing.');
-  }
-
-  // Backend expects path variable id and DTO body.
-  const payload = {
-    status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
-  };
-
-  const patchUrl = `${UPDATE_VEHICLE_API_URL}/updateVehicle/${encodeURIComponent(normalizedVehicleId)}`;
-
-  let response;
-
-  try {
-    const requestOptions = {
-      method: 'PATCH',
-      headers: getAuthHeaders(true),
-      body: JSON.stringify(payload)
-    };
-
-    response = await fetch(patchUrl, requestOptions);
-  } catch {
-    throw new Error(`Unable to reach vehicle update API at ${patchUrl}. Check backend server/CORS settings.`);
-  }
-
-  const candidateEndpoints = [
-    UPDATE_VEHICLE_API_URL,
-    `${VEHICLES_API_URL}/update`,
-    `${VEHICLES_API_URL}/status`
-  ];
-
-  let lastError = null;
-
-  for (const endpoint of candidateEndpoints) {
-    const response = await fetch(`${UPDATE_VEHICLE_API_URL}/updateVehicle/${Number(vehicleId)}`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(true),
-      body: JSON.stringify(payload)
+      body: requestBody
     });
+  } catch {
+    throw new Error(`Unable to reach vehicle update API at ${requestUrl}. Check backend server/CORS settings.`);
+  }
 
-    let responseBody = {};
+  let responseBody = {};
 
-    try {
-      responseBody = await response.json();
-    } catch {
-      responseBody = {};
-    }
+  try {
+    responseBody = await apiResponse.json();
+  } catch {
+    throw new Error(`Unable to reach vehicle update API at ${patchUrl}. Check backend server/CORS settings.`);
+  }
 
-    if (response.status === 401 || response.status === 403) {
-      throw new Error('Session expired. Please log in again.');
-    }
+  if (apiResponse.status === 401 || apiResponse.status === 403) {
+    throw new Error('Session expired. Please log in again.');
+  }
 
-    if (response.ok) {
-      return;
-    }
-
-    if (response.status !== 404) {
-      throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${response.status}`);
-    }
-
-    lastError = responseBody?.message || `Endpoint not found: ${endpoint}`;
+  if (!apiResponse.ok) {
+    throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${apiResponse.status}`);
   }
 
   throw new Error(lastError || `Failed to ${normalizedAction} vehicle.`);
