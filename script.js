@@ -268,7 +268,7 @@ async function patchVehicleStatus(vehicleId, action) {
 
   const requestUrl = `${UPDATE_VEHICLE_API_URL}/updateVehicle/${encodeURIComponent(normalizedVehicleId)}`;
   const requestBody = JSON.stringify({
-    status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
+    vehicleStatus: normalizedAction === 'accept' ? 'ACCEPTED' : 'DECLINED'
   });
 
   let apiResponse;
