@@ -274,21 +274,45 @@ async function patchVehicleStatus(vehicleId, action) {
     body: JSON.stringify(payload)
   });
 
-  let responseBody = {};
+  const candidateEndpoints = [
+    UPDATE_VEHICLE_API_URL,
+    `${VEHICLES_API_URL}/update`,
+    `${VEHICLES_API_URL}/status`
+  ];
 
-  try {
-    responseBody = await response.json();
-  } catch {
-    responseBody = {};
+  let lastError = null;
+
+  for (const endpoint of candidateEndpoints) {
+    const response = await fetch(endpoint, {
+      method: 'PATCH',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify(payload)
+    });
+
+    let responseBody = {};
+
+    try {
+      responseBody = await response.json();
+    } catch {
+      responseBody = {};
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (response.ok) {
+      return;
+    }
+
+    if (response.status !== 404) {
+      throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${response.status}`);
+    }
+
+    lastError = responseBody?.message || `Endpoint not found: ${endpoint}`;
   }
 
-  if (response.status === 401 || response.status === 403) {
-    throw new Error('Session expired. Please log in again.');
-  }
-
-  if (!response.ok) {
-    throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${response.status}`);
-  }
+  throw new Error(lastError || `Failed to ${normalizedAction} vehicle.`);
 }
 
 async function loadVehiclesFromApi() {
@@ -756,15 +780,15 @@ async function loadRolesFromApi() {
   }
 }
 
-async function createRole(roleName) {
-  if (!roleName) {
+async function createRole(name) {
+  if (!name) {
     throw new Error('Role name is required.');
   }
 
   const response = await fetch(CREATE_ROLE_API_URL, {
     method: 'POST',
     headers: getAuthHeaders(true),
-    body: JSON.stringify({ roleName })
+    body: JSON.stringify({ name })
   });
 
   let responseBody = {};
