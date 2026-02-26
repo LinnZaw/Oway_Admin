@@ -836,19 +836,30 @@ function mapRole(rawRole) {
   };
 }
 
+function formatRoleId(roleId) {
+  const numericId = Number(roleId);
+
+  if (!Number.isFinite(numericId)) {
+    return 'N/A';
+  }
+
+  return `RID-${String(Math.trunc(numericId)).padStart(3, '0')}`;
+}
+
 function renderRoles(roles) {
   if (!roles.length) {
     roleTableBody.innerHTML = `
       <tr>
-        <td colspan="2" class="text-center text-muted py-4">No roles found.</td>
+        <td colspan="3" class="text-center text-muted py-4">No roles found.</td>
       </tr>
     `;
     return;
   }
 
-  roleTableBody.innerHTML = roles.map((role) => `
+  roleTableBody.innerHTML = roles.map((role, index) => `
     <tr>
-      <td class="fw-semibold">${role.id}</td>
+      <td class="fw-semibold">${index + 1}</td>
+      <td class="fw-semibold">${formatRoleId(role.id)}</td>
       <td>${role.name}</td>
     </tr>
   `).join('');
