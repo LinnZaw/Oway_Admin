@@ -378,25 +378,25 @@ body {
 }
 
 
-.rentals-panel {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  margin-bottom: 0 !important;
-  overflow: hidden;
+.rental-trip-table thead th {
+  background: #fff8db;
+  color: #7c5a00;
 }
 
-.rental-table-scroll {
-  flex: 1;
-  min-height: 0;
-  max-height: calc(100vh - 290px);
-  overflow: auto;
-  margin-bottom: 0;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(100, 116, 139, 0.65) transparent;
+.rental-trip-table tbody tr:hover {
+  background: #fffbeb;
 }
 
-.rental-table-scroll .table {
-  margin-bottom: 0;
+.rental-distance-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff3cd;
+  border: 1px solid #ffe69c;
+  color: #664d03;
+  font-weight: 600;
+  font-size: 0.85rem;
 }

@@ -69,8 +69,28 @@
               <p class="text-muted mb-0 small">Track rental records, monitor status, and review customer activity.</p>
             </div>
 
-            <div id="rentalApiNotice" class="alert alert-info py-2 px-3 small mb-3">
-              Loading rental records from API.
+          <div class="row g-3">
+            <div class="col-lg-8">
+              <div class="panel p-3 p-md-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h3 class="h5 mb-0 fw-bold">Live Trip Queue</h3>
+                  <span class="badge bg-warning text-dark">Real-time</span>
+                </div>
+                <div class="table-responsive">
+                  <table class="table align-middle rental-trip-table">
+                    <thead>
+                      <tr>
+                        <th>Ride ID</th>
+                        <th>Distance (km)</th>
+                        <th>Vehicle No.</th>
+                        <th>Status</th>
+                        <th>ETA</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tripTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
             <div class="table-responsive rental-table-scroll">
