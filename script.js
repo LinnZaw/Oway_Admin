@@ -637,14 +637,12 @@ function renderUsers(users) {
       <td class="fw-semibold">${formatUserId(user.id)}</td>
       <td class="fw-semibold">${index + 1}</td>
       <td>${user.name}</td>
+      <td class="fw-semibold">${formatUserId(user.id)}</td>
       <td>${user.roles.length ? user.roles.join(', ') : '<span class="text-muted">No roles assigned</span>'}</td>
       <td>
         <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-gradient-primary btn-sm view-user-profile-btn" data-user-id="${user.id ?? ''}" data-user-name="${user.name}" data-user-email="${user.email}">
             <i class="bi bi-person-vcard me-1"></i>View Profile
-          </button>
-          <button class="btn btn-soft-secondary btn-sm copy-user-id-btn" data-user-id="${user.id ?? ''}">
-            <i class="bi bi-clipboard me-1"></i>Copy ID
           </button>
         </div>
       </td>
@@ -821,17 +819,6 @@ async function viewUserProfile(userId, userName, userEmail = '') {
   } catch (error) {
     setUserNotice('danger', error.message);
   }
-}
-
-function copyUserId(userId) {
-  if (!userId) {
-    setUserNotice('warning', 'This user does not have a visible ID in API response.');
-    return;
-  }
-
-  navigator.clipboard.writeText(String(userId))
-    .then(() => setUserNotice('success', `User ID ${userId} copied to clipboard.`))
-    .catch(() => setUserNotice('warning', `Copy failed. User ID: ${userId}`));
 }
 
 // ================================
@@ -1220,11 +1207,6 @@ userTableBody.addEventListener('click', (event) => {
     return;
   }
 
-  const copyButton = event.target.closest('.copy-user-id-btn');
-
-  if (copyButton) {
-    copyUserId(copyButton.dataset.userId || '');
-  }
 });
 
 vehicleTableBody.addEventListener('click', async (event) => {
