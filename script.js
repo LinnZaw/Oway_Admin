@@ -45,8 +45,6 @@ const cancelRoleBtn = document.getElementById('cancelRoleBtn');
 const vehiclesPage = document.getElementById('vehiclesPage');
 const vehicleTableBody = document.getElementById('vehicleTableBody');
 const vehicleApiNotice = document.getElementById('vehicleApiNotice');
-const rentalTableBody = document.getElementById('rentalTableBody');
-const rentalApiNotice = document.getElementById('rentalApiNotice');
 const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
 const rentalTableBody = document.getElementById('rentalTableBody');
 const rentalApiNotice = document.getElementById('rentalApiNotice');
@@ -141,13 +139,32 @@ function setRentalLoading(isLoading) {
 
 function mapRental(rawRental) {
   return {
-    id: rawRental.id ?? rawRental.rentalId ?? 'N/A',
-    vehicleId: rawRental.vehicleId ?? null,
-    userId: rawRental.userId ?? null,
+    id: rawRental.id ?? 'N/A',
+    customerId: rawRental.customerId ?? null,
+    driverId: rawRental.driverId ?? null,
+
+    driverName:
+      rawRental.vehicle?.user?.profile?.fullName ||
+      rawRental.vehicle?.user?.name ||
+      'N/A',
+
+    plateNumber:
+      rawRental.vehicle?.plateNumber || 'N/A',
+
     distance: rawRental.distance ?? 0,
     rentalStatus: String(rawRental.rentalStatus || 'UNKNOWN').toUpperCase(),
     rentalTime: rawRental.rentalTime || null
   };
+}
+
+function formatCustomerId(customerId) {
+  const numericId = Number(customerId);
+
+  if (!Number.isFinite(numericId)) {
+    return 'N/A';
+  }
+
+  return `CID-${String(Math.trunc(numericId)).padStart(3, '0')}`;
 }
 
 function normalizeRentalCollection(responseBody) {
@@ -247,9 +264,9 @@ function renderRentals() {
   rentalTableBody.innerHTML = allRentals.map((rental) => `
     <tr>
       <td class="fw-semibold">${rental.id}</td>
-      <td>${getDriverLabel(rental.vehicleId)}</td>
-      <td>${getVehicleNoLabel(rental.vehicleId)}</td>
-      <td>Customer #${rental.userId ?? 'N/A'}</td>
+      <td>${rental.driverName}</td>
+      <td>${rental.plateNumber}</td>
+      <td>${formatCustomerId(rental.customerId)}</td>
       <td><span class="rental-distance-cell">${Number(rental.distance || 0).toFixed(1)} km</span></td>
       <td>
         <span class="badge rounded-pill fw-semibold ${getRentalStatusBadgeClass(rental.rentalStatus)}">
@@ -409,8 +426,9 @@ async function patchVehicleStatus(vehicleId, action) {
   }
 
   const requestUrl = `${UPDATE_VEHICLE_API_URL}/updateVehicle/${encodeURIComponent(normalizedVehicleId)}`;
+
   const requestBody = JSON.stringify({
-    status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
+    vehicleStatus: normalizedAction === 'accept' ? 'ACCEPTED' : 'DECLINED'
   });
 
   let apiResponse;
@@ -430,7 +448,7 @@ async function patchVehicleStatus(vehicleId, action) {
   try {
     responseBody = await apiResponse.json();
   } catch {
-    throw new Error(`Unable to reach vehicle update API at ${patchUrl}. Check backend server/CORS settings.`);
+    responseBody = {};
   }
 
   if (apiResponse.status === 401 || apiResponse.status === 403) {
@@ -438,10 +456,12 @@ async function patchVehicleStatus(vehicleId, action) {
   }
 
   if (!apiResponse.ok) {
-    throw new Error(responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${apiResponse.status}`);
+    throw new Error(
+      responseBody?.message || `Failed to ${normalizedAction} vehicle. Status ${apiResponse.status}`
+    );
   }
 
-  throw new Error(lastError || `Failed to ${normalizedAction} vehicle.`);
+  return responseBody;
 }
 
 async function loadVehiclesFromApi() {
@@ -634,7 +654,6 @@ function renderUsers(users) {
 
   userTableBody.innerHTML = users.map((user, index) => `
     <tr>
-      <td class="fw-semibold">${formatUserId(user.id)}</td>
       <td class="fw-semibold">${index + 1}</td>
       <td>${user.name}</td>
       <td class="fw-semibold">${formatUserId(user.id)}</td>
