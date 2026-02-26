@@ -595,6 +595,16 @@ function mapUser(rawUser) {
   };
 }
 
+function formatUserId(userId) {
+  const numericId = Number(userId);
+
+  if (!Number.isFinite(numericId)) {
+    return 'N/A';
+  }
+
+  return `UID-${String(Math.trunc(numericId)).padStart(3, '0')}`;
+}
+
 function getDisplayLocation(profile = {}) {
   const directLocation = profile.address || profile.locationName || profile.city || profile.location;
 
@@ -616,7 +626,7 @@ function renderUsers(users) {
   if (!users.length) {
     userTableBody.innerHTML = `
       <tr>
-        <td colspan="4" class="text-center text-muted py-4">No users found.</td>
+        <td colspan="5" class="text-center text-muted py-4">No users found.</td>
       </tr>
     `;
     return;
@@ -624,6 +634,7 @@ function renderUsers(users) {
 
   userTableBody.innerHTML = users.map((user, index) => `
     <tr>
+      <td class="fw-semibold">${formatUserId(user.id)}</td>
       <td class="fw-semibold">${index + 1}</td>
       <td>${user.name}</td>
       <td>${user.roles.length ? user.roles.join(', ') : '<span class="text-muted">No roles assigned</span>'}</td>
