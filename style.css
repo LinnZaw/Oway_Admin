@@ -376,3 +376,44 @@ body {
 .vehicle-table-scroll::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, rgba(100, 116, 139, 0.95), rgba(71, 85, 105, 0.95));
 }
+
+
+.rental-table thead th {
+  background: #fff8db;
+  color: #7c5a00;
+}
+
+.rental-table tbody tr:hover {
+  background: #fffbeb;
+}
+
+.rental-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.rental-table-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - 290px);
+  overflow: auto;
+}
+
+.rental-table {
+  margin-bottom: 0;
+}
+
+.rental-distance-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff3cd;
+  border: 1px solid #ffe69c;
+  color: #664d03;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
