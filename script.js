@@ -265,7 +265,7 @@ async function patchVehicleStatus(vehicleId, action) {
 
   // Backend expects path variable id and DTO body.
   const payload = {
-    status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
+    vehicleStatus: normalizedAction === 'accept' ? 'ACCEPTED' : 'DECLINED'
   };
 
   const response = await fetch(`${UPDATE_VEHICLE_API_URL}/updateVehicle/${Number(vehicleId)}`, {
@@ -283,7 +283,7 @@ async function patchVehicleStatus(vehicleId, action) {
   let lastError = null;
 
   for (const endpoint of candidateEndpoints) {
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${UPDATE_VEHICLE_API_URL}/updateVehicle/${Number(vehicleId)}`, {
       method: 'PATCH',
       headers: getAuthHeaders(true),
       body: JSON.stringify(payload)
