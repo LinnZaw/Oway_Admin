@@ -24,6 +24,7 @@ const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
+const UPDATE_VEHICLE_API_URL = 'http://localhost:8000/api/admin';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
 
 // ================================
@@ -262,9 +263,15 @@ async function patchVehicleStatus(vehicleId, action) {
     throw new Error('Invalid vehicle action.');
   }
 
-  const response = await fetch(`http://localhost:8000/api/admin/vehicles/${vehicleId}/${normalizedAction}`, {
+  // Backend expects path variable id and DTO body.
+  const payload = {
+    status: normalizedAction === 'accept' ? 'ACCEPTED' : 'REJECTED'
+  };
+
+  const response = await fetch(`${UPDATE_VEHICLE_API_URL}/updateVehicle/${Number(vehicleId)}`, {
     method: 'PATCH',
-    headers: getAuthHeaders()
+    headers: getAuthHeaders(true),
+    body: JSON.stringify(payload)
   });
 
   let responseBody = {};
