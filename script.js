@@ -7,7 +7,7 @@ const CREATE_ROLE_API_URL = 'http://localhost:8000/api/admin/roles';
 const USERS_API_URL = 'http://localhost:8000/api/admin/getUser';
 const PROFILES_API_URL = 'http://localhost:8000/api/admin/getProfiles';
 const VEHICLES_API_URL = 'http://localhost:8000/api/admin/getVehicle';
-const TRANSACTIONS_API_URL = 'http://localhost:8000/api/admin/getTransaction';
+const TRANSACTIONS_API_URL = 'http://localhost:8000/api/admin/transaction';
 const UPDATE_VEHICLE_API_URL = 'http://localhost:8000/api/admin';
 const RENTALS_API_URL = 'http://localhost:8000/api/admin/getRentals';
 const AUTH_STORAGE_KEY = 'oway_admin_token';
@@ -56,6 +56,12 @@ const rentalTableBody = document.getElementById('rentalTableBody');
 const rentalApiNotice = document.getElementById('rentalApiNotice');
 const rentalLoading = document.getElementById('rentalLoading');
 
+//for lgoin btn
+const loginSubmitBtn = loginForm
+  ? loginForm.querySelector('button[type="submit"]')
+  : null;
+
+
 let allUsers = [];
 let allProfiles = [];
 let allRoles = [];
@@ -64,7 +70,7 @@ let allTransactions = [];
 let filteredTransactions = [];
 let roleLookupById = new Map();
 let allRentals = [];
-let roleLookupById = new Map();
+// let roleLookupById = new Map();
 let rentalRelativeTimer = null;
 
 // ================================
@@ -335,11 +341,11 @@ async function loadRentalsFromApi() {
     allRentals = normalizeRentalCollection(responseBody).map(mapRental);
     renderRentals();
     refreshRentalRelativeTimes();
-    setRentalNotice('success', `Loaded ${allRentals.length} rentals from API.`);
+    setRentalNotice('success', `Loaded ${allRentals.length} rentals.`);
   } catch (error) {
     allRentals = [];
     renderRentals();
-    setRentalNotice('danger', `Failed to load rentals from API. ${error.message}`);
+    setRentalNotice('danger', `Failed to load rentals. ${error.message}`);
   } finally {
     setRentalLoading(false);
   }
@@ -502,11 +508,11 @@ async function loadVehiclesFromApi() {
 
     allVehicles = list.map(mapVehicle);
     renderVehicles(allVehicles);
-    setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles from API.`);
+    setVehicleNotice('success', `Loaded ${allVehicles.length} vehicles.`);
   } catch (error) {
     allVehicles = [];
     renderVehicles([]);
-    setVehicleNotice('danger', `Failed to load vehicles from API. ${error.message}`);
+    setVehicleNotice('danger', `Failed to load vehicles. ${error.message}`);
   }
 }
 
@@ -695,12 +701,12 @@ async function loadTransactionsFromApi() {
 
     allTransactions = list.map(mapTransaction);
     filterTransactions();
-    setTransactionNotice('success', `Loaded ${allTransactions.length} transactions from API.`);
+    setTransactionNotice('success', `Loaded ${allTransactions.length} transactions.`);
   } catch (error) {
     allTransactions = [];
     filteredTransactions = [];
     renderTransactions([]);
-    setTransactionNotice('danger', `Failed to load transactions from API. ${error.message}`);
+    setTransactionNotice('danger', `Failed to load transactions. ${error.message}`);
   }
 }
 
@@ -969,11 +975,11 @@ async function loadUsersFromApi() {
 
     const noRoleCount = allUsers.filter((user) => !user.roles.length).length;
     const roleText = noRoleCount ? ` (${noRoleCount} users without mapped roles)` : '';
-    setUserNotice('success', `Loaded ${allUsers.length} users from API${roleText}.`);
+    setUserNotice('success', `Loaded ${allUsers.length} users${roleText}.`);
   } catch (error) {
     allUsers = [];
     renderUsers([]);
-    setUserNotice('danger', `Failed to load users from API. ${error.message}`);
+    setUserNotice('danger', `Failed to load users. ${error.message}`);
   }
 }
 
@@ -1126,12 +1132,12 @@ async function loadRolesFromApi() {
     allRoles = list.map(mapRole);
     roleLookupById = new Map(allRoles.map((role) => [String(role.id), role.name]));
     renderRoles(allRoles);
-    setRoleNotice('success', `Loaded ${allRoles.length} roles from API.`);
+    setRoleNotice('success', `Loaded ${allRoles.length} roles.`);
   } catch (error) {
     allRoles = [];
     roleLookupById = new Map();
     renderRoles([]);
-    setRoleNotice('danger', `Failed to load roles from API. ${error.message}`);
+    setRoleNotice('danger', `Failed to load roles. ${error.message}`);
   }
 }
 
@@ -1336,6 +1342,8 @@ function showLogin() {
 }
 
 function setLoginLoadingState(isLoading) {
+  if (!loginSubmitBtn) return;
+
   loginSubmitBtn.disabled = isLoading;
   loginSubmitBtn.textContent = isLoading ? 'Logging in...' : 'Login';
 }
