@@ -1353,6 +1353,13 @@ async function login(name, password) {
     throw new Error('Username and password are required.');
   }
 
+  // Local fallback login requested for Admin/admin so users can enter the dashboard
+  // without depending on the backend auth API.
+  if (name === 'Admin' && password === 'admin') {
+    setStoredToken('local-admin-bypass-token');
+    return;
+  }
+
   const response = await fetch(LOGIN_API_URL, {
     method: 'POST',
     headers: {
